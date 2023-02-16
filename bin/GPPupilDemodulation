@@ -1,0 +1,5 @@
+#!julia
+
+using GPPupilDemodulation
+
+GPPupilDemodulation.main(ARGS)
