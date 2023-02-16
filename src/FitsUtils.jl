@@ -1,17 +1,23 @@
 module FitsUtils
 import Base: Dict, names, write
 
-import CFITSIO: FITSFile, bitpix_from_type,libcfitsio,fits_assert_ok,fits_update_key
+import CFITSIO: FITSFile, bitpix_from_type,libcfitsio,fits_assert_ok,fits_update_key,fits_movabs_hdu
 using FITSIO
 #import FITSIO: fits_create_img
 
 name(hdu::HDU) = FITSIO.fits_try_read_extname(hdu.fitsfile)
 
-names(hdu::TableHDU) = FITSIO.colnames(hdu)
+Base.names(hdu::TableHDU) = FITSIO.colnames(hdu)
 
 extver(hdu::HDU) = FITSIO.fits_try_read_extver(hdu.fitsfile)
 
-function Dict(hdu::TableHDU) 
+
+
+# function rewind(file::FITSFile)
+# 	fits_movabs_hdu(f::FITSFile, 1)
+# end
+
+function Base.Dict(hdu::TableHDU) 
 	D = Dict{String,Any}()
 	for name ∈ names(hdu)
 		push!(D,name => read(hdu,name))
@@ -41,9 +47,9 @@ function fits_create_empty_hdu(f::FITSFile)
     fits_assert_ok(status[])
 end
 
-write(f::FITS, Nothing; kwds...) = write(f;kwds...)
+Base.write(f::FITS, Nothing; kwds...) = write(f;kwds...)
 
-function write(f::FITS;
+function Base.write(f::FITS;
 	header::Union{Nothing, FITSHeader}=nothing,
 	name::Union{Nothing, String}=nothing,
 	ver::Union{Nothing, Integer}=nothing)
@@ -65,6 +71,7 @@ FITScopy!(dst::FITS,src::FITS) = FITScopy!(dst,src,(),())
 function FITScopy!(dst::FITS,src::FITS,content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}})  where {N,T1<:AbstractDict,T2<:AbstractArray} 
     FITScopy!(dst,src,content,())
 end
+
 function FITScopy!(dst::FITS,
 		src::FITS,
 		content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}},
@@ -72,11 +79,14 @@ function FITScopy!(dst::FITS,
 	 
 	Dcontent = Dict(content)
 	Dheader = Dict(header)
-
+	hdr=nothing
 	for hdu ∈ src
-		hdr = pop!(Dheader,name(hdu),read_header(hdu))
-		if haskey(Dcontent,name(hdu))
-			cntnt = pop!(Dcontent,name(hdu))
+		hduname =name(hdu)
+
+		hdr = pop!(Dheader,hduname,read_header(hdu))
+		
+		if haskey(Dcontent,hduname)
+			cntnt = pop!(Dcontent,hduname)			
 		else
 			if isa(hdu,TableHDU)
 				cntnt = Dict(hdu)
@@ -89,9 +99,8 @@ function FITScopy!(dst::FITS,
 			end
 		end
 		
-		write(dst,cntnt;header=hdr,name=name(hdu),ver=extver(hdu))
+		write(dst,cntnt;header=hdr,name=hduname,ver=extver(hdu))
 	end
-	
 	for (key,cntnt) ∈ Dcontent
 		hdr = pop!(Dheader,key,nothing)
 		write(dst,cntnt;header=hdr,name=key)
