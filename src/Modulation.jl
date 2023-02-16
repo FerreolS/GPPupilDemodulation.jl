@@ -4,6 +4,11 @@ using OptimPackNextGen
 using LinearAlgebra
 import OptimPackNextGen.Powell.Newuoa.newuoa
 
+@enum side FT=0 SC=16
+@enum diode D1=1 D2=2 D3=3 D4=4 FC
+const ȷ=im
+
+
 function idx(side_::side,telescope_::Integer, diode_::diode) 
 	if diode_==FC
 		return 32 + Integer(side_)÷4  + (telescope_-1) + 1
