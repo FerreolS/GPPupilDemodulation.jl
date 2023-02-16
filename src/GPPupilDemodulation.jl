@@ -81,6 +81,9 @@ function main(args)
 		"--verbose", "-v"
 			help = "Verbose mode"
 			action = :store_true
+		"--overwrite", "-w"
+			help = "overwrite the original file"
+			action = :store_true
 		"--dir", "-d"
 			nargs = 1
 			action = :store_arg
@@ -107,7 +110,12 @@ function main(args)
 		end
 	end
 
-			
+	folder = parsed_args["dir"][1]
+	if folder[1] !='/'
+		folder = pwd() * "/" * folder
+		mkpath(folder)
+	end
+
 	for filename in files
 		if isfile(filename)
 			if endswith(filename,suffixes)
@@ -134,7 +142,7 @@ function main(args)
 						println("$filename processed in $(tend-tstart) s")
 					end
 					fname = split(basename(filename),".fits")[1]
-					outname = parsed_args["dir"][1] *"/" * fname * parsed_args["suffix"][1] *".fits"
+					outname = folder *"/" * fname * parsed_args["suffix"][1] *".fits"
 					close(f)
 					f= FITS(filename)
 					g = FITS(outname, "w")
