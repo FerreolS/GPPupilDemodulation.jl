@@ -73,6 +73,23 @@ function updatemodulation!( model::Vector{Complex{T}}, self::modulation{T}, time
 	return model
 end
 
+
+
+function updatemodulation!( model::Vector{Complex{T}}, jac::Matrix{Complex{T}}, self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
+	self.b = b
+	self.ϕ = ϕ
+	@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+
+	@. jac[:,1] = ȷ * model * sin( self.ω * timestamp + ϕ )
+	# D model / D ϕ
+	@. jac[:,2] = ȷ * b* model * cos( self.ω * timestamp + ϕ )
+
+	(self.c, self.a) = linearregression( model, data)
+	@. model = 	self.c + self.a * model
+	@. jac = self.a * model
+	return model
+end
+
 function linearregression( model::Vector{Complex{T}}, data::Vector{Complex{T}}) where{T<:AbstractFloat}
 	N = length(model)
 	Sv1 = sum(data)
@@ -117,9 +134,20 @@ function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ
 	return sum(abs2,( pupilmodulation .- self.data))
 end
 
+function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ::T,gx::Vector{T}) where{T<:AbstractFloat}
+	jac = similar(pupilmodulation, (axes(pupilmodulation)...,2))
+	updatemodulation!(pupilmodulation, jac, self.mod, self.timestamp, self.data, b, ϕ)
+   	residual = pupilmodulation .- self.data
+	gx .= real.(jac' * residual)
+	return 0.5 * sum(abs2,residual)
+end
+
 (self::Chi2CostFunction{T})() where{T<:AbstractFloat}  = self(self.mod.b,self.mod.ϕ)
 (self::Chi2CostFunction{T})(x::Vector{T}) where{T<:AbstractFloat}  = self(x[1],x[2])
 (self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::Vector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2])
+
+(self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::Vector{T},gx::Vector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2],gx)
+
 
 function minimize!(self::Chi2CostFunction{T};  kwd...) where {T<:AbstractFloat}
 	minimize!(Val(:newoa),self::Chi2CostFunction{T};kwd...) 
@@ -147,6 +175,14 @@ function minimize!(::Val{:vmlmbZ},self::Chi2CostFunction{T};  xinit=[0.01,0]) wh
 	return x
 end
 
+function minimize!(::Val{:vmlmb},self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFloat}	
+	scratch =Vector{Complex{T}}(undef,self.N)
+	xinit = T.(xinit)
+	gx = similar(xinit)
+	cost(x,gx) = self(scratch,x,gx)
+	x = vmlmb(cost, xinit)
+	return x
+end
 
 function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; algo=:newoa, xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
 
