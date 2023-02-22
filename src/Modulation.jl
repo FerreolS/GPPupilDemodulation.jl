@@ -1,8 +1,9 @@
 
-using StatsBase
-using OptimPackNextGen
-using LinearAlgebra
 import OptimPackNextGen.Powell.Newuoa.newuoa
+
+using LinearAlgebra
+using OptimPackNextGen
+using StatsBase
 
 @enum side FT=0 SC=16
 @enum diode D1=1 D2=2 D3=3 D4=4 FC
@@ -20,38 +21,35 @@ mutable struct modulation{T<:AbstractFloat}
 	c::Complex{T}
 	a::Complex{T}
 	b::T
-	ϕ1::T
+	ϕ::T
 	ω::T
 end
 
-function modulation(;T=Float32,c=0.,a=1.,b=1.,ϕ1=0.,ω=2π)
-	return modulation{T}(c,a,b,ϕ1, ω)
+function modulation(;T=Float32,c=0.,a=1.,b=1.,ϕ=0.,ω=2π)
+	return modulation{T}(c,a,b,ϕ, ω)
 end
 
 function modulation{T}(mod::modulation) where{T<:AbstractFloat}
-	return modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ1, mod.ω))...)
+	return modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
 end
 
 function (self::modulation{T})(timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
 	timestamp = T.(timestamp)
-	return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ1 ))
+	return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
 end
 
-function updatemodulation(self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ1::T) where{T<:AbstractFloat}
+function updatemodulation(self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
-	self.ϕ1 = ϕ1
-	model = exp.(ȷ .* (b .* sin.( self.ω .* timestamp .+ ϕ1 )))
+	self.ϕ = ϕ
+	model = exp.(ȷ .* (b .* sin.( self.ω .* timestamp .+ ϕ )))
 	(self.c, self.a) = linearregression( model, data)
 	return 	self.c .+ self.a .* model
 end
 
-function updatemodulation!( model::Vector{Complex{T}}, self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ1::T) where{T<:AbstractFloat}
+function updatemodulation!( model::Vector{Complex{T}}, self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
-	self.ϕ1 = ϕ1
-	@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ1 )))
-	# @inbounds @simd for i in eachindex(model,timestamp)
-	# 	model[i] =  exp(ȷ * (b * sin( self.ω * timestamp[i] + ϕ1 )))
-	# end
+	self.ϕ = ϕ
+	@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
 	(self.c, self.a) = linearregression( model, data)
 	@. model = 	self.c + self.a * model
 	return model
@@ -60,8 +58,7 @@ end
 function linearregression( model::Vector{Complex{T}}, data::Vector{Complex{T}}) where{T<:AbstractFloat}
 	N = length(model)
 	Sv1 = sum(data)
-	Sv2 = data ⋅ model
-
+	Sv2 = model ⋅ data
 	H12 = mean(model)
 	detH = 1/(N*(1 - abs2(H12)))
 	c = (Sv1 .- Sv2 .* H12) * detH
@@ -88,8 +85,8 @@ function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}}; kwd...) wh
 	return Chi2CostFunction{T}(modulation(;T=T,kwd...),timestamp,data)
 end
 
-function (self::Chi2CostFunction{T})(b::T,ϕ1::T) where{T<:AbstractFloat}
-	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data, b, ϕ1)
+function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
+	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data, b, ϕ)
 	return sum(abs2,( pupilmodulation .- self.data))
 end
 
@@ -97,8 +94,8 @@ function Chi2CostFunction(pupilmodulation::Vector{Complex{T}},timestamp::Vector,
 	return Chi2CostFunction{T}(pupilmodulation,modulation(;T=T,kwd...),timestamp,data)
 end
 
-function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ1::T) where{T<:AbstractFloat}
-	 updatemodulation!(pupilmodulation, self.mod, self.timestamp, self.data, b, ϕ1)
+function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
+	updatemodulation!(pupilmodulation, self.mod, self.timestamp, self.data, b, ϕ)
 	return sum(abs2,( pupilmodulation .- self.data))
 end
 
@@ -117,7 +114,7 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( time::Vector{T},data::Matrix{Complex{T}})   where{T<:AbstractFloat}
+function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[π,0])   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{modulation{T}}(undef,40) 
@@ -125,7 +122,7 @@ function demodulateall( time::Vector{T},data::Matrix{Complex{T}})   where{T<:Abs
 		FCphase = angle.(data[:,idx(k,j,FC)])
 		for i ∈ (D1,D2,D3,D4)
 			lkl = Chi2CostFunction(time, view(data,:,idx(k,j,i)) .* exp.(-1im.*FCphase))
-			minimize!(lkl,xinit=[π/2,0.])
+			minimize!(lkl,xinit=xinit)
 			@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(time)))))
 			
 			param[idx(k,j,i)] = lkl.mod
