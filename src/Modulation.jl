@@ -41,6 +41,11 @@ end
 function updatemodulation(self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
+	if b==0.
+		self.c = 0
+		self.a = mean(data)
+		return self.a .* ones(Complex{T},size(data))
+	end
 	model = exp.(ȷ .* (b .* sin.( self.ω .* timestamp .+ ϕ )))
 	(self.c, self.a) = linearregression( model, data)
 	return 	self.c .+ self.a .* model
@@ -49,9 +54,15 @@ end
 function updatemodulation!( model::Vector{Complex{T}}, self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
-	@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
-	(self.c, self.a) = linearregression( model, data)
-	@. model = 	self.c + self.a * model
+	if b==0.
+		self.c = 0
+		self.a = mean(data)
+		fill(self.a, model)
+	else
+		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+		(self.c, self.a) = linearregression( model, data)
+		@. model = 	self.c + self.a * model
+	end
 	return model
 end
 
@@ -119,9 +130,9 @@ function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[π,0]) 
 	output = copy(data)
 	param = Vector{modulation{T}}(undef,40) 
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
-		FCphase = angle.(data[:,idx(k,j,FC)])
+		FCphasor = exp.(-1im.*angle.(data[:,idx(k,j,FC)]))
 		for i ∈ (D1,D2,D3,D4)
-			lkl = Chi2CostFunction(time, view(data,:,idx(k,j,i)) .* exp.(-1im.*FCphase))
+			lkl = Chi2CostFunction(time, view(data,:,idx(k,j,i)) .* FCphasor)
 			minimize!(lkl,xinit=xinit)
 			@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(time)))))
 			
