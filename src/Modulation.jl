@@ -2,8 +2,10 @@
 import OptimPackNextGen.Powell.Newuoa.newuoa
 
 using LinearAlgebra
+using Optim
 using OptimPackNextGen
 using StatsBase
+using Zygote
 
 @enum side FT=0 SC=16
 @enum diode D1=1 D2=2 D3=3 D4=4 FC
@@ -52,7 +54,7 @@ function updatemodulation(self::modulation{T}, timestamp::Vector{T}, data::Vecto
 		return self.a .* ones(Complex{T},size(data))
 	end
 	model = exp.(ȷ .* (b .* sin.( self.ω .* timestamp .+ ϕ )))
-	(self.c, self.a) = linearregression( model, data)
+	(self.c, self.a) = Zygote.@ignore linearregression( model, data)
 	return 	self.c .+ self.a .* model
 end
 
@@ -119,19 +121,34 @@ end
 (self::Chi2CostFunction{T})(x::Vector{T}) where{T<:AbstractFloat}  = self(x[1],x[2])
 (self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::Vector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2])
 
-function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFloat}
+function minimize!(self::Chi2CostFunction{T};  kwd...) where {T<:AbstractFloat}
+	minimize!(Val(:newoa),self::Chi2CostFunction{T};kwd...) 
+end
+
+function minimize!(::Val{:newoa},self::Chi2CostFunction{T};  xinit=[0.01,0]) where {T<:AbstractFloat}
 	scratch =Vector{Complex{T}}(undef,self.N)
 	xinit = T.(xinit)
 	(status, x, χ2) =  newuoa(x ->self(scratch,x) , xinit,1,1e-3,maxeval=1500)
-	return x
+	return x	
+end
 
+function minimize!(::Val{:simplex},self::Chi2CostFunction{T};  xinit=[0.01,0]) where {T<:AbstractFloat}
+	scratch =Vector{Complex{T}}(undef,self.N)
+	xinit = T.(xinit)
 	# using Nelder Mead simplex method from Optim.jl is 3x slower than newoa
-	# res = optimize(x ->self(scratch,x) , xinit, NelderMead())
-	# return Optim.minimizer(res)
+	res = optimize(x ->self(scratch,x) , xinit, NelderMead())
+	return Optim.minimizer(res)
 	
 end
 
-function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
+function minimize!(::Val{:vmlmbZ},self::Chi2CostFunction{T};  xinit=[0.01,0]) where {T<:AbstractFloat}
+	xinit = T.(xinit)
+	x = vmlmb(x->self(x), xinit;autodiff=true)
+	return x
+end
+
+
+function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; algo=:newoa, xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{modulation{T}}(undef,32) 
