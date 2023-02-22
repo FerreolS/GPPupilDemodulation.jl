@@ -110,6 +110,7 @@ function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ
 	return sum(abs2,( pupilmodulation .- self.data))
 end
 
+(self::Chi2CostFunction{T})() where{T<:AbstractFloat}  = self(self.mod.b,self.mod.ϕ)
 (self::Chi2CostFunction{T})(x::Vector{T}) where{T<:AbstractFloat}  = self(x[1],x[2])
 (self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::Vector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2])
 
@@ -125,19 +126,33 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[π,0])   where{T<:AbstractFloat}
+function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0])   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{modulation{T}}(undef,40) 
+	likelihood =  Vector{T}(undef,40) 
+	ϕrange= range(0,π,5)
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
 		FCphasor = exp.(-1im.*angle.(data[:,idx(k,j,FC)]))
 		for i ∈ (D1,D2,D3,D4)
-			lkl = Chi2CostFunction(time, view(data,:,idx(k,j,i)) .* FCphasor)
-			minimize!(lkl,xinit=xinit)
+			d = view(data,:,idx(k,j,i)) .* FCphasor
+			lkl = Chi2CostFunction(time,d )
+			if xinit==:auto
+				binit= initialguess(d)
+				ϕinit = ϕrange[argmin(map(ϕ -> lkl(binit,ϕ),ϕrange ))]
+				xinit=[binit, ϕinit]
+			end
+			x = minimize!(lkl,xinit=xinit)
+			likelihood[idx(k,j,i)] = lkl(x)
+#			@show i , j ,k , lkl()
 			@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(time)))))
 			
 			param[idx(k,j,i)] = lkl.mod
 		end
 	end
-	return (output, param)
+	return (output, param,likelihood)
+end
+
+function initialguess(data::Vector{Complex{T}}) where{T<:AbstractFloat}
+	std(angle.(data .* exp.(-1ȷ .*angle(mean(data)))))
 end

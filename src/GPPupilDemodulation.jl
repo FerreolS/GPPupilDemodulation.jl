@@ -50,7 +50,7 @@ function processmetrology(metrologyhdu::TableHDU; verb=Bool)
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
 
-	(output, param) = demodulateall(time, cmplxV)
+	(output, param,likelihood) = demodulateall(time, cmplxV)
 	volt[1:2:end,:] .=  real(output)'
 	volt[2:2:end,:] .=  imag(output)'
 	table["VOLT"] .= Float32.(volt)
