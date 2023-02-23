@@ -61,10 +61,10 @@ function processmetrology(metrologyhdu::TableHDU; keepraw = false,verb=false)
 		volt[1:2:end,:] .=  real(output)'
 		volt[2:2:end,:] .=  imag(output)'
 	end
-	table["VOLT"] .= Float32.(volt)
+	table["VOLT"] = Float32.(volt)
 
 	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
-	for (i,j,k) ∈ Iterators.product((FT,SC),1:4,(D1,D2,D3,D4)) 
+	for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
 		setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER RE $i  T$j  $k")
 		setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER IM $i  T$j  $k")
 		setindex!(hdr,real(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE RE $i  T$j  $k")
