@@ -65,10 +65,12 @@ function processmetrology(metrologyhdu::TableHDU; keepraw = false,verb=false)
 
 	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
 	for (i,j,k) ∈ Iterators.product((FT,SC),1:4,(D1,D2,D3,D4)) 
-		setindex!(hdr,param[idx(i,j,k)].c,"DEMODULATION METROLOGY CENTER $j  T$i  $k")
-		setindex!(hdr,param[idx(i,j,k)].a,"DEMODULATION METROLOGY AMPLITUDE $j  T$i  $k")
-		setindex!(hdr,param[idx(i,j,k)].b,"DEMODULATION METROLOGY SIN AMPLITUDE $j  T$i  $k")
-		setindex!(hdr,param[idx(i,j,k)].ϕ,"DEMODULATION METROLOGY PHASE $j  T$i  $k")
+		setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER RE $i  T$j  $k")
+		setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER IM $i  T$j  $k")
+		setindex!(hdr,real(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE RE $i  T$j  $k")
+		setindex!(hdr,imag(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE IM $i  T$j  $k")
+		setindex!(hdr,param[idx(i,j,k)].b,"DEMODULATION SIN AMPLITUDE $i  T$j  $k")
+		setindex!(hdr,param[idx(i,j,k)].ϕ,"DEMODULATION SIN PHASE $i  T$j  $k")
 	end
 	return (table, hdr) 
 end
