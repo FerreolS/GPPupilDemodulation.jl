@@ -43,19 +43,33 @@ function Base.endswith(chains::Vector{String},pattern::AbstractString)
 end
 
 
-function processmetrology(metrologyhdu::TableHDU; verb=Bool)
+function processmetrology(metrologyhdu::TableHDU; keepraw = false,verb=false)
 	hdr = read_header(metrologyhdu)
 	table = Dict(metrologyhdu)
 	time = Float64.(table["TIME"]).*1e-6
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
-
 	(output, param,likelihood) = demodulateall(time, cmplxV)
-	volt[1:2:end,:] .=  real(output)'
-	volt[2:2:end,:] .=  imag(output)'
+
+	if keepraw
+		s = similar(volt,80+64,size(volt,2))
+		s[1:80,:] .= volt
+		s[81:2:end,:] .=  real(output[:,1:32])'
+		s[82:2:end,:] .=  imag(output[:,1:32])'
+		volt = s
+	else
+		volt[1:2:end,:] .=  real(output)'
+		volt[2:2:end,:] .=  imag(output)'
+	end
 	table["VOLT"] .= Float32.(volt)
 
 	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
+	for (i,j,k) ∈ Iterators.product((FT,SC),1:4,(D1,D2,D3,D4)) 
+		setindex!(hdr,param[idx(i,j,k)].c,"DEMODULATION METROLOGY CENTER $j  T$i  $k")
+		setindex!(hdr,param[idx(i,j,k)].a,"DEMODULATION METROLOGY AMPLITUDE $j  T$i  $k")
+		setindex!(hdr,param[idx(i,j,k)].b,"DEMODULATION METROLOGY SIN AMPLITUDE $j  T$i  $k")
+		setindex!(hdr,param[idx(i,j,k)].ϕ,"DEMODULATION METROLOGY PHASE $j  T$i  $k")
+	end
 	return (table, hdr) 
 end
 
@@ -80,6 +94,9 @@ function main(args)
 			action = :store_true
 		"--verbose", "-v"
 			help = "Verbose mode"
+			action = :store_true
+		"--keepraw", "-k"
+			help = "keep raw"
 			action = :store_true
 		"--overwrite", "-w"
 			help = "overwrite the original file"
@@ -135,7 +152,7 @@ function main(args)
 					tstart = time()
 
 					metrologyhdu = f["METROLOGY"]
-					(table, hdr) = processmetrology(metrologyhdu; verb=parsed_args["verbose"])
+					(table, hdr) = processmetrology(metrologyhdu; verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"])
 					
 					tend = time()
 					if parsed_args["verbose"]
