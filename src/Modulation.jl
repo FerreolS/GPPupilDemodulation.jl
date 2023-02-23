@@ -126,11 +126,11 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0])   where{T<:AbstractFloat}
+function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
 
 	output = copy(data)
-	param = Vector{modulation{T}}(undef,40) 
-	likelihood =  Vector{T}(undef,40) 
+	param = Vector{modulation{T}}(undef,32) 
+	likelihood =  Vector{T}(undef,32) 
 	ϕrange= range(0,π,5)
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
 		FCphasor = exp.(-1im.*angle.(data[:,idx(k,j,FC)]))
@@ -145,8 +145,12 @@ function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0]
 			x = minimize!(lkl,xinit=xinit)
 			likelihood[idx(k,j,i)] = lkl(x)
 #			@show i , j ,k , lkl()
-			@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(time)))))
-			
+			if recenter
+				piston = angle( lkl.mod.c .+ lkl.mod.a)
+				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(time))) - piston))
+			else
+				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(time)))))
+			end
 			param[idx(k,j,i)] = lkl.mod
 		end
 	end
