@@ -65,12 +65,12 @@ function processmetrology(metrologyhdu::TableHDU; keepraw = false,verb=false)
 
 	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
 	for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
-		setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i  T$j  $k")
-		setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i  T$j  $k")
-		setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i  T$j  $k")
-		setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i  T$j  $k")
-		setindex!(hdr,param[idx(i,j,k)].b,"DEMODULATION SIN AMPLITUDE $i  T$j  $k")
-		setindex!(hdr,param[idx(i,j,k)].ϕ,"DEMODULATION SIN PHASE $i  T$j  $k")
+		setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i T$j $k")
+		setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i T$j $k")
+		setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i T$j $k")
+		setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i T$j $k")
+		setindex!(hdr,param[idx(i,j,k)].b,"DEMODULATION SIN AMPLITUDE $i T$j $k")
+		setindex!(hdr,param[idx(i,j,k)].ϕ,"DEMODULATION SIN PHASE $i T$j $k")
 	end
 	return (table, hdr) 
 end
