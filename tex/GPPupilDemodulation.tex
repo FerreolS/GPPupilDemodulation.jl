@@ -6,8 +6,6 @@
 \usepackage[T1]{fontenc}
 \usepackage{stmaryrd}
 
-\newcommand*{\Title}{Notes about GRAVITY+ metrology demodulation}
-\newcommand*{\Authors}{Éric Thiébaut et al.}
 
 \renewcommand{\AdjointLetter}{\mathrm{T}}
 \usepackage{lmodern}
@@ -61,19 +59,8 @@ For each diode in \{D1, D2, D3, D4\}, we define the complex measurement $\V{v} \
 \begin{equation}
     \V{v} = \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\,.\label{eq:v}
 \end{equation}
-where $\omega = 2\,\pi$ is the modulation pulsation, the amplitude $b$  and the phase $\phi$ parameters of the modulation has to be estimated to demodulate the metrology signal.
+where $\omega = 2\,\pi\,\V{t}$ is the modulation pulsation built from the \verb|TIME| column, the amplitude $b$  and the phase $\phi$  are the modulation parameters to be estimated to demodulate the metrology signal.
 
-% For a  diode in \{D1, D2, D3, D4\} the modulated voltages for both $x_{mod}(t)$ and $y_{mod}(t)$ directions as a function of time are given by:
-% \begin{align}
-% x_{mod}(t) &= x_0 + a' \sin\left(b \sin\left(2\,\pi\frac{t}{f} + \phi\right) + \phi_2\right) \label{eq:x0} \\
-% y_{mod}(t) &= y_0 + a' \cos\left(b \sin\left(2\,\pi\frac{t}{f}\,t + \phi\right) + \phi_2\right)\,,\label{eq:y0}
-% \end{align}
-% where $\omega = 2\,\pi$ is the known modulation pulsation. $(x_0,y_0)$ is the position of center of the pupil, $a'$ and $b$ are amplitude terms, $\phi$   and $\phi_2$ are phase terms. All these 6 terms as to be estimated in order to demodulate the metrology signal. 
-
-% The equations \ref{eq:x0} and \ref{eq:y0} can be rewritten as a single complex equation with  for each row $i$ of the table the measurement vector $\V{v}$  as $v_i= x_i + \jmath y_i$  and the pulsation $\omega_i = 2\pi\,t_i$ :
-% \begin{equation}
-%     \V{v} = c + a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\,.\label{eq:v}
-% \end{equation}
 
 \section{The overall model}
 For a  diode the measured modulated voltage data $\V{d}$ can be modeled by:
@@ -91,14 +78,6 @@ To estimate the modulation parameters we need to disentangle it from the signal 
     \V{s} = a  + \V{\delta v}\,
 \end{equation}
 $\abs{a}$  and $\arg{(a)}$ being the  mean amplitude and phase respectively of the metrology signal.  $ \V{\delta v}$ is centered ($\Expect{\delta v}= 0$)  and supposed to be Gaussian independant and identically distributed.
-
-% From the equations \ref{eq:v} and  \ref{eq:model}, two complex quantities and two real quantities are needed to demodulate the signal.
-% \begin{itemize}
-%     \item $c = x_0 + \jmath\,y_0$
-%     \item $a = a' \,\exp\left( \jmath\,\phi2\right)$
-%     \item $b \in \Reals$ 
-%     \item $\phi \in \Reals$
-% \end{itemize}
 
 Under this assumption, the modulation parameters $( b, \phi)$, the center $c$ and the mean of the metrology signal $a$ can be estimated using least square:
 \begin{equation}
@@ -164,7 +143,7 @@ Once the modulation parameters are estimated the demodulated signal is given by:
 \V{s} =\left(\V{r} - c^+\right)\times\exp\left( \jmath \, b^+ \sin\large( \V{\omega} + \phi^+_1\large)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)\,,\label{eq:demodulation}
 \end{equation}
 
-All the $6\times4$ parameters are store as keyword in the METROLOGY table header as shown on the table \ref{tab:keyword}. These keywords are suffixed with the side, the telescope number and the diode (\eg \verb|DEMODULATION CENTER X0 SC T4 D1|).
+All the $6\times4\times4\times2$ parameters are stored in keywords of the METROLOGY table header as shown on the table \ref{tab:keyword}. These keywords are suffixed with the side, the telescope number and the diode (\eg \verb|DEMODULATION CENTER X0 SC T4 D1|).
 \begin{table}[]
     \centering
     \begin{tabular}{l c l}
@@ -180,10 +159,3 @@ modulation phase  &      $\phi^+ $       &   \verb|DEMODULATION SIN PHASE|
     \label{tab:keyword}
 \end{table}
 \end{document}
-
-setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i  T$j  $k")
-setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i  T$j  $k")
-setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i  T$j  $k")
-setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i  T$j  $k")
-setindex!(hdr,param[idx(i,j,k)].b,"DEMODULATION SIN AMPLITUDE $i  T$j  $k")
-setindex!(hdr,param[idx(i,j,k)].ϕ,"DEMODULATION SIN PHASE $i  T$j  $k")
