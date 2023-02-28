@@ -13,8 +13,8 @@ Gravity+ Metrology metrology demodulation module
 will demodulate all the file contained in folder `/data/ESO_archive_night/2023-01-05`  and place the demodulated files in `output_folder`
 
 ### Notebook
-[Notebook](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/notebooks/MetrologyModulation.ipynb) on the metrology data
-Nbviewer do not show plots, most of them can be seen 
+[Notebook](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/notebooks/MetrologyModulation.ipynb) on the metrology data.
+As Nbviewer cannot show plots properly, most of them can be seen 
 [here](https://jovian.ml/ferreols/gravity-metrology-modulation/v/1)
 ### Notes demodulation
 [![Notes about GRAVITY+ metrology demodulation](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/gh-pages/GPPupilDemodulation.svg)](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/gh-pages/GPPupilDemodulation.pdf)
