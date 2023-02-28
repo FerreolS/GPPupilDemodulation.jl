@@ -1,0 +1,152 @@
+\RequirePackage[dvipsnames,hyperref,table]{xcolor}
+\documentclass[a4paper,11pt,twoside]{scrartcl}
+\input{preamble}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+
+\newcommand*{\Title}{Notes about GRAVITY+ metrology demodulation}
+\newcommand*{\Authors}{Éric Thiébaut et al.}
+
+\renewcommand{\AdjointLetter}{\mathrm{T}}
+\usepackage{lmodern}
+\DeclareUnicodeCharacter{00B5}{\ensuremath{\mu}} % µ
+\DeclareUnicodeCharacter{2264}{\ensuremath{\le}} % ≤
+\DeclareUnicodeCharacter{2265}{\ensuremath{\ge}} % ≥
+\DeclareUnicodeCharacter{22C5}{\!\cdot\!}
+\usepackage{graphicx} % Required for inserting images
+
+
+\title{Notes about GRAVITY+ metrology demodulation}
+
+
+\author{Ferréol Soulez }
+\date{February 2023}
+
+\begin{document}
+
+\maketitle
+
+\section{The metrology table}
+The metrology data is stored as a FITS Table in the \verb+METROLOGY+ HDU (10$^\textrm{th}$) as in table \ref{tab:table}. The voltages \verb+VOLT+ are composed of $80$ columns:
+\begin{itemize}
+    \item 2 directions ($x$ and  $y$) per diodes
+    \item 4 diodes per telescope (one on each spiders)
+    \item 1 fiber coupler diode (labeled \verb+FC+) per telescope
+    \item 4 telescopes
+    \item 2 sides: \verb|FT|  and \verb|SC|
+\end{itemize}
+The signals (the table column) are sample at $500\,$Hz leading to a very large number of rows. 
+\begin{table}[]
+    \centering
+    \begin{tabular}{l| l ll}
+Name   &       Size  & Type  &   TFORM   \\
+\hline
+TIME   &              & Int32  &  1J     \\
+VOLT   &       (80,) & Float32 &  80E    \\
+POWER\_LASER   &    &   Float32 & 1E     \\
+LAMBDA\_LASER   &    &  Float32 & 1E     
+    \end{tabular}
+    \caption{Metrology table}
+    \label{tab:table}
+\end{table}
+
+\section{The modulation model}
+
+When the pupil modulation is on ( \verb|ESO INS PMC1 MODULATE| keyword is \verb|true|) the metrology signal is modulated at a frequency of $f=1\,$Hz. 
+This modulation does not affect the fiber coupler diode.
+
+For a  diode in \{D1, D2, D3, D4\} the modulated voltages for both $x_{mod}(t)$ and $y_{mod}(t)$ directions as a function of time are given by:
+\begin{align}
+x_{mod}(t) &= x_0 + a' \sin\left(b \sin\left(2\,\pi\frac{t}{f} + \phi_1\right) + \phi_2\right) \label{eq:x0} \\
+y_{mod}(t) &= y_0 + a' \cos\left(b \sin\left(2\,\pi\frac{t}{f}\,t + \phi_1\right) + \phi_2\right)\,,\label{eq:y0}
+\end{align}
+where $\omega = 2\,\pi$ is the known modulation pulsation. $(x_0,y_0)$ is the position of center of the pupil, $a'$ and $b$ are amplitude terms, $\phi_1$   and $\phi_2$ are phase terms. All these 6 terms as to be estimated in order to demodulate the metrology signal. 
+
+The equations \ref{eq:x0} and \ref{eq:y0} can be rewritten as a single complex equation with  for each row $i$ of the table the measurement vector $\V{v}$  as $v_i= x_i + \jmath y_i$  and the pulsation $\omega_i = 2\pi\,t_i$ :
+\begin{equation}
+    \V{v} = c + a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi_1\right)\right)\,.\label{eq:v}
+\end{equation}
+
+\section{The overall model}
+For a  diode in \{D1, D2, D3, D4\} the measured modulated voltage data $\V{d}$ can be modeled by:
+\begin{equation}
+    \V{d} = \left( c + \V{s} \times  \exp\left( \jmath \, b \sin\large( \V{\omega} + \phi_1\large)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:model}
+\end{equation}
+where $\times$ is the element-wise multiplication, $\V{s}$ is the sought-after demodulated signal, $\Phi_\textrm{FC}$ is the phase of the fiber coupler measurement accounting for FDDL movements. $\V{e}$ is a vector representing the errors on the measurement that are supposed Gaussian centered, independent and identically distributed of unit variance.
+
+\section{ Estimating the modulation parameters}
+
+From the equations \ref{eq:v} and  \ref{eq:model}, two complex quantities and two real quantities are needed to demodulate the signal.
+\begin{itemize}
+    \item $c = x_0 + \jmath\,y_0$
+    \item $a = a' \,\exp\left( \jmath\,\phi2\right)$
+    \item $b \in \Reals$ 
+    \item $\phi_1 \in \Reals$
+\end{itemize}
+Supposing that the signal $\V{s}$ is uncorrelated with the modulation and does not contain any energy at $1\,$Hz, the modulation parameters can be estimated using least square:
+\begin{equation}
+    (c^+, a^+, b^+, \phi_1^+) = \argmin_{c,a,b,\phi_1} \Norm{\V{d} -  \left(c + a \exp\left( \jmath \, b \sin\Large( \V{\omega} + \phi_1\right)\Large)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right) }_2^2
+\end{equation}
+that is equivalent with : 
+\begin{equation}
+    (c^+, a^+, b^+, \phi_1^+) = \argmin_{c,a,b,\phi_1} \Norm{\V{r} -  c - a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi_1\right)\right) }_2^2\label{eq:r}
+\end{equation}
+with $\V{r} =\V{d}\times\exp\left(-\jmath\,\Phi_\textrm{FC}\right)$.
+
+\subsection{Linear estimates}
+From the equation \ref{eq:r}, we can see that the parameters  $c$ and $a$ depends linearly of the  $\V{d}$ and the modulation phasor $\V{m} = \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi_1\right)\right)$. For a given values of $b$ and $\phi_1$, the optimal values $c^+$ and $a^+$ have a closed-form solution that is:
+\begin{equation}
+    \left[\begin{array}{l}
+    c^+\\
+    a^+
+    \end{array}\right] = \M{A}^{-1} 
+    \left[\begin{array}{l}
+    \sum_i d_i\\
+    \V{m}\T\V{d}
+    \end{array}\right] 
+\end{equation}
+where $\V{m}\T$ is the conjugate transpose of $\V{m}$ and $\M{A}$ is the $2\times2$ matrix:
+\begin{equation}
+    \M{A} = \left[\begin{array}{ll}
+    N & \sum_i m_i\\
+    \sum_i  m_i^* & N
+    \end{array}\right] \,,
+\end{equation}
+where $m_i^*$ is the complex conjugate of $m_i$ and $N$  the number of measurements. Its inverse is:
+\begin{equation}
+   \M{A}^{-1} \frac{1}{N^2 \left(1 - \Abs{ \sum_i d_i}^2\right)}\,\left[\begin{array}{ll}
+    N & - \sum_i m_i\\
+    - \sum_i  m_i^* & N
+    \end{array}\right] 
+\end{equation}
+For a couple $(b,\phi_1)$ the optimal $c^+(b,\phi_1)$ and $a^+(b,\phi_1)$ is given by:
+\begin{align}
+    c^+(b,\phi_1) &= \frac{N\,\sum_i d_i - \V{m}\T\V{d}\sum_i m_i}{N^2 \left(1 - \Abs{ \sum_i d_i}^2\right)}\\
+    a^+(b,\phi_1) &= \frac{ -N\,\left(\sum_i d_i\right)  \left(\sum_i  m_i^*\right)+ \V{m}\T\V{d}}{N^2 \left(1 - \Abs{ \sum_i d_i}^2\right)}
+\end{align}
+
+\subsection{Non-linear estimates}
+The modulation parameters estimation amounts to estimate only $b$  and $\phi_1$, optimizing the function:
+\begin{equation}
+   f(b,\phi_1) = \Norm{\V{r} -  c^+(b,\phi_1) - a^+(b,\phi_1) \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi_1\right)\right) }_2^2\label{eq:nl}
+\end{equation}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.45\linewidth]{figs/GV1D1SC.png}
+    \includegraphics[width=0.45\linewidth]{figs/GV3D3SC.png}
+    \caption{$f(b,\phi_1)$ for two different diodes}
+    \label{fig:GV1D1SC}
+\end{figure}
+
+This function is non-linear and non-convex as it can be seen on figure \ref{fig:GV1D1SC}. The two main optimum are equivalent as $f(b,\phi_1) f(-b,\phi_1+ \pi )$ An initialization with $b$ sufficiently small seems to ensure to end in the global optimum. Note that the case $b=0$ is singular  as $f(b,\phi_1)$ is equal to the variance of $\V{r}$ in this case whatever is $\phi_1$, $a$ and $ c$.
+
+In the code this function is minimizes by the mean of the derivative free NEWOA method of powel that seems faster than VMLMB (with derivative) and  the Simplex method.
+\section{Demodulation}
+Once the modulation parameters are estimated the demodulated signal is given by:
+\begin{equation}
+\V{s} =\left(\V{r} - c^+\right)\times\exp\left( \jmath \, b^+ \sin\large( \V{\omega} + \phi^+_1\large)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)\,,\label{eq:demodulation}
+\end{equation}
+
+\end{document}
