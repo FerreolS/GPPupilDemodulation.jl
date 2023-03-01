@@ -1,10 +1,11 @@
-\RequirePackage[dvipsnames,hyperref,table]{xcolor}
 \documentclass[a4paper,11pt,twoside]{scrartcl}
 \input{preamble}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{stmaryrd}
+\RequirePackage[hyperref,table]{xcolor}
+
 
 
 \renewcommand{\AdjointLetter}{\mathrm{T}}
@@ -65,7 +66,7 @@ where $\omega = 2\,\pi\,\V{t}$ is the modulation pulsation built from the \verb|
 \section{The overall model}
 For a  diode the measured modulated voltage data $\V{d}$ can be modeled by:
 \begin{equation}
-    \V{d} = \left( c + \V{s} \times  \exp\left( \jmath \, b \sin\large( \V{\omega} + \phi\large)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:model}
+    \V{d} = \left( c + \V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:model}
 \end{equation}
 where $\times$ is the element-wise multiplication, $\V{s}$ is the sought-after demodulated  metrology signal, $\Phi_\textrm{FC}$ is the phase of the fiber coupler measurement accounting for FDDL movements. $c  = x_0 + \jmath\,y_0$ is the center of the pupil and $\V{e}$ is a vector representing the errors on the measurement that are supposed Gaussian centered, independent and identically distributed.
 
@@ -77,11 +78,11 @@ To estimate the modulation parameters we need to disentangle it from the signal 
 \begin{equation}
     \V{s} = a  + \V{\delta v}\,
 \end{equation}
-$\abs{a}$  and $\arg{(a)}$ being the  mean amplitude and phase respectively of the metrology signal.  $ \V{\delta v}$ is centered ($\Expect{\delta v}= 0$)  and supposed to be Gaussian independant and identically distributed.
+$\abs{a}$  and $\arg{(a)}$ being the  mean amplitude and phase respectively of the metrology signal.  $ \V{\delta v}$ is centered ($\Expect{\delta v}= 0$)  and supposed to be Gaussian independent and identically distributed.
 
 Under this assumption, the modulation parameters $( b, \phi)$, the center $c$ and the mean of the metrology signal $a$ can be estimated using least square:
 \begin{equation}
-    (c^+, a^+, b^+, \phi^+) = \argmin_{c,a,b,\phi} \Norm{\V{d} -  \left(c + a \exp\left( \jmath \, b \sin\Large( \V{\omega} + \phi\right)\Large)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right) }_2^2
+    (c^+, a^+, b^+, \phi^+) = \argmin_{c,a,b,\phi} \Norm{\V{d} -  \left(c + a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right) }_2^2
 \end{equation}
 that is equivalent with : 
 \begin{equation}
@@ -134,13 +135,13 @@ The modulation parameters estimation amounts to estimate only $b$  and $\phi$, o
     \label{fig:GV1D1SC}
 \end{figure}
 
-This function is non-linear and non-convex as it can be seen on figure \ref{fig:GV1D1SC}. The two main optimum are equivalent as $f(b,\phi) f(-b,\phi+ \pi )$ An initialization with $b$ sufficiently small seems to ensure to end in the global optimum. Note that the case $b=0$ is singular  as $f(b,\phi)$ is equal to the variance of $\V{r}$ in this case whatever is $\phi$, $a$ and $ c$.
+This function is non-linear and non-convex as it can be seen on figure \ref{fig:GV1D1SC}. The two main optima are equivalent as $f(b,\phi) =  f(-b,\phi+ \pi )$. An initialization with $b$ sufficiently small seems to ensure to end in the global optimum. Note that the case $b=0$ is singular  as $f(b,\phi)$ is equal to the variance of $\V{r}$ in this case whatever is $\phi$  and $ c$.
 
-In the code this function is minimizes by the mean of the derivative free NEWOA method of powel that seems faster than VMLMB (with derivative) and  the Simplex method.
+In the code, this function is minimized by the means of the derivative free NEWOA method of Powell that seems faster than VMLMB (with derivative) and  the Simplex method.
 \section{Demodulation}
 Once the modulation parameters are estimated the demodulated signal is given by:
 \begin{equation}
-\V{s} =\left(\V{r} - c^+\right)\times\exp\left( \jmath \, b^+ \sin\large( \V{\omega} + \phi^+_1\large)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)\,,\label{eq:demodulation}
+\V{s} =\left(\V{r} - c^+\right)\times\exp\left( \jmath \, b^+ \sin\left( \V{\omega} + \phi^+_1\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)\,,\label{eq:demodulation}
 \end{equation}
 
 All the $6\times4\times4\times2$ parameters are stored in keywords of the METROLOGY table header as shown on the table \ref{tab:keyword}. These keywords are suffixed with the side, the telescope number and the diode (\eg \verb|DEMODULATION CENTER X0 SC T4 D1|).
@@ -150,8 +151,8 @@ All the $6\times4\times4\times2$ parameters are stored in keywords of the METROL
 Name   &          & keyword   \\
 center    &      $\Re(c^+)$        &   \verb|DEMODULATION CENTER X0|   \\
 center   &      $\Im(c^+) $       &   \verb|DEMODULATION CENTER Y0|   \\
-metrology amplitude  &      $\Abs{a^+} $       &   \verb|DEMODULATION AMPLITUDE ABS|   \\
-metrology phase  &      $\arg{(a^+)} $       &   \verb|DEMODULATION AMPLITUDE ARG|   \\
+metrology mean amplitude  &      $\Abs{a^+} $       &   \verb|DEMODULATION AMPLITUDE ABS|   \\
+metrology mean phase  &      $\arg{(a^+)} $       &   \verb|DEMODULATION AMPLITUDE ARG|   \\
 modulation amplitude  &      $b^+ $       &   \verb|DEMODULATION SIN AMPLITUDE |   \\
 modulation phase  &      $\phi^+ $       &   \verb|DEMODULATION SIN PHASE|   
     \end{tabular}
