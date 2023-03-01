@@ -16,14 +16,15 @@ will demodulate all the file contained in folder `/data/ESO_archive_night/2023-0
 
 ```julia
 
-julia> @btime (out,param) = GPPupilDemodulation.demodulateall(algo=:simplex,times,cmplxV);
-  6.207 s (17395 allocations: 8.49 GiB)
 
 julia> @btime (out,param) = GPPupilDemodulation.demodulateall(algo=:newoa,times,cmplxV);
-  1.938 s (5053 allocations: 3.32 GiB)
+  1.706 s (4494 allocations: 2.94 GiB)
+
+julia> @btime (out,param) = GPPupilDemodulation.demodulateall(algo=:simplex,times,cmplxV);
+  7.107 s (17498 allocations: 8.74 GiB)
 
 julia> @btime (out,param) = GPPupilDemodulation.demodulateall(algo=:vmlmbZ,times,cmplxV);
-  8.477 s (164324 allocations: 30.94 GiB)
+  7.101 s (170702 allocations: 24.10 GiB)
 
 ```
 

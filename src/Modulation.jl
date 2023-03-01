@@ -200,7 +200,7 @@ function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; algo=:newoa, x
 				ϕinit = ϕrange[argmin(map(ϕ -> lkl(binit,ϕ),ϕrange ))]
 				xinit=[binit, ϕinit]
 			end
-			x = minimize!(lkl,xinit=xinit)
+			x = minimize!(Val(algo),lkl,xinit=xinit)
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
 				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, time)) - FCphase- angle(lkl.mod.a)))
