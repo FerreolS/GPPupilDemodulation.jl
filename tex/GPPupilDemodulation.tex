@@ -144,7 +144,7 @@ Once the modulation parameters are estimated the demodulated signal is given by:
 \V{s} =\left(\V{r} - c^+\right)\times\exp\left( \jmath \, b^+ \sin\left( \V{\omega} + \phi^+_1\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)\,,\label{eq:demodulation}
 \end{equation}
 
-All the $6\times4\times4\times2$ parameters are stored in keywords of the METROLOGY table header as shown on the table \ref{tab:keyword}. These keywords are suffixed with the side, the telescope number and the diode (\eg \verb|DEMODULATION CENTER X0 SC T4 D1|).
+All the $6\times4\times4\times2$ parameters are stored in keywords of the METROLOGY table header as shown on the table \ref{tab:keyword}. These keywords are suffixed with the side, the telescope number and the diode (\eg \verb|DEMODULATION CENTER X0 SC T4 D1|). In addition,  the keyword \verb|PROCSOFT| of the METROLOGY table header is set to \texttt{GPPupilDemodulation.jl}
 \begin{table}[]
     \centering
     \begin{tabular}{l c l}
