@@ -11,6 +11,7 @@ include("Modulation.jl")
 using ArgParse, FITSIO
 
 const suffixes = [".fits", ".fits.gz","fits.Z"]
+const MJD_1970_1_1 = 40587.0
 
 """
 	endswith(chain::Union{String,Vector{String}}, pattern::Vector{String})
@@ -42,8 +43,24 @@ function Base.endswith(chains::Vector{String},pattern::AbstractString)
 	return false
 end
 
+function buildfaintparameters(hdr::FITSHeader)
 
-function processmetrology(metrologyhdu::TableHDU; keepraw = false,verb=false)
+	mjdobs = hdr["MJD-OBS"]
+	rate1 = hdr["ESO INS ANLO3 RATE1"]
+	rate2 = hdr["ESO INS ANLO3 RATE2"]
+
+	repeat1 = hdr["ESO INS ANLO3 REPEAT1"]
+	repeat2 = hdr["ESO INS ANLO3 REPEAT2"]
+
+	start1 =hdr["ESO INS ANLO3 TIMER1"] -  (hdr["MJD-OBS"] - MJD_1970_1_1)*24*60*60 
+	start2 = hdr["ESO INS ANLO3 TIMER2"]-  (hdr["MJD-OBS"] - MJD_1970_1_1)*24*60*60 
+
+	voltage1 = hdr["ESO INS ANLO3 voltage1"]
+	voltage2 = hdr["ESO INS ANLO3 voltage2"]
+	return FaintParameter{Float64}(rate1,rate2,repeat1,repeat2, start1,start2,voltage1,voltage2)
+end
+
+function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintParameter} = nothing, keepraw = false,verb=false)
 	hdr = read_header(metrologyhdu)
 	table = Dict(metrologyhdu)
 	time = Float64.(table["TIME"]).*1e-6
@@ -145,6 +162,7 @@ function main(args)
 		if isfile(filename)
 			if endswith(filename,suffixes)
 				pupmod=false
+				metmod="ON"
 				f= FITS(filename)
 				try (pupmod,) = read_key(f[1],"ESO INS PMC1 MODULATE")
 				catch
@@ -154,13 +172,31 @@ function main(args)
 					continue
 				end		
 				if pupmod
+					faintparam =  nothing
 					if parsed_args["verbose"]
 						println("Processing  $filename")
 					end
 					tstart = time()
 
+					try (metmod,) = read_key(f[1],"ESO INS MET MODE")
+						if parsed_args["verbose"]
+							println("$filename use $metmod metrology mode")
+						end
+						if metmod=="OFF"
+							continue
+						end
+					catch
+						if parsed_args["verbose"]
+							println("No ESO INS MET MODE keyword, mode set to $metmod")
+						end
+					end
+
+					if metmod == "FAINT"
+						faintparam = buildfaintparameters(f[1])
+					end
+
 					metrologyhdu = f["METROLOGY"]
-					(table, hdr) = processmetrology(metrologyhdu; verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"])
+					(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"])
 					
 					tend = time()
 					if parsed_args["verbose"]

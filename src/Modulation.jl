@@ -17,7 +17,18 @@ function idx(side_::side,telescope_::Integer, diode_::diode)
 	return Integer(side_) + (Integer(diode_)-1) + (telescope_-1)*4 + 1 
 end
 
-mutable struct modulation{T<:AbstractFloat}
+struct FaintParameter{T<:AbstractFloat}
+	rate1::T
+	rate2::T
+	repeat1::Int64
+	repeat2::Int64
+	start1::T
+	start2::T
+	voltage1::T
+	voltage2::T
+end
+
+mutable struct Modulation{T<:AbstractFloat}
 	c::Complex{T}
 	a::Complex{T}
 	b::T
@@ -25,25 +36,25 @@ mutable struct modulation{T<:AbstractFloat}
 	ω::T
 end
 
-function modulation(;T=Float32,c=0.,a=1.,b=1.,ϕ=0.,ω=2π)
-	return modulation{T}(c,a,b,ϕ, ω)
+function Modulation(;T=Float32,c=0.,a=1.,b=1.,ϕ=0.,ω=2π)
+	return Modulation{T}(c,a,b,ϕ, ω)
 end
 
-function modulation{T}(mod::modulation) where{T<:AbstractFloat}
-	return modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
+function Modulation{T}(mod::Modulation) where{T<:AbstractFloat}
+	return Modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
 end
 
-function (self::modulation{T})(timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
+function (self::Modulation{T})(timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
 	timestamp = T.(timestamp)
 	return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
 end
 
-function getphase(self::modulation{T},timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
+function getphase(self::Modulation{T},timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
 	timestamp = T.(timestamp)
 	return self.b .* sin.( self.ω .* timestamp .+ self.ϕ ) .+ angle(self.a)
 end
 
-function updatemodulation(self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation(self::Modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -56,7 +67,7 @@ function updatemodulation(self::modulation{T}, timestamp::Vector{T}, data::Vecto
 	return 	self.c .+ self.a .* model
 end
 
-function updatemodulation!( model::Vector{Complex{T}}, self::modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation!( model::Vector{Complex{T}}, self::Modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -85,10 +96,10 @@ end
 
 struct Chi2CostFunction{T<:AbstractFloat}
     N::Int
-    mod::modulation{T}
+    mod::Modulation{T}
     timestamp::Vector{T}
     data::Vector{Complex{T}}
-    function Chi2CostFunction{T}(mod::modulation{T},
+    function Chi2CostFunction{T}(mod::Modulation{T},
         timestamp::Vector,
         data::Vector{Complex{T}}) where {T<:AbstractFloat}
         N =length(timestamp);
@@ -98,7 +109,7 @@ struct Chi2CostFunction{T<:AbstractFloat}
 end
 
 function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}}; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T}(modulation(;T=T,kwd...),timestamp,data)
+	return Chi2CostFunction{T}(Modulation(;T=T,kwd...),timestamp,data)
 end
 
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
@@ -107,7 +118,7 @@ function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
 end
 
 function Chi2CostFunction(pupilmodulation::Vector{Complex{T}},timestamp::Vector,data::Vector{Complex{T}}; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T}(pupilmodulation,modulation(;T=T,kwd...),timestamp,data)
+	return Chi2CostFunction{T}(pupilmodulation,Modulation(;T=T,kwd...),timestamp,data)
 end
 
 function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
@@ -134,7 +145,7 @@ end
 function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
 
 	output = copy(data)
-	param = Vector{modulation{T}}(undef,32) 
+	param = Vector{Modulation{T}}(undef,32) 
 	likelihood =  Vector{T}(undef,32) 
 	ϕrange= range(0,π,5)
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
