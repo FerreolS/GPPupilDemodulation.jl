@@ -10,8 +10,9 @@ include("Modulation.jl")
 
 using ArgParse, FITSIO
 
-const suffixes = [".fits", ".fits.gz","fits.Z"]
+const SUFFIXES = [".fits", ".fits.gz","fits.Z"]
 const MJD_1970_1_1 = 40587.0
+const DAY_TO_SEC = 24*60*60 
 
 """
 	endswith(chain::Union{String,Vector{String}}, pattern::Vector{String})
@@ -52,21 +53,23 @@ function buildfaintparameters(hdr::FITSHeader)
 	repeat1 = hdr["ESO INS ANLO3 REPEAT1"]
 	repeat2 = hdr["ESO INS ANLO3 REPEAT2"]
 
-	start1 =hdr["ESO INS ANLO3 TIMER1"] -  (hdr["MJD-OBS"] - MJD_1970_1_1)*24*60*60 
-	start2 = hdr["ESO INS ANLO3 TIMER2"]-  (hdr["MJD-OBS"] - MJD_1970_1_1)*24*60*60 
+	start1 = hdr["ESO INS ANLO3 TIMER1"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
+	start2 = hdr["ESO INS ANLO3 TIMER2"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
 
-	voltage1 = hdr["ESO INS ANLO3 voltage1"]
-	voltage2 = hdr["ESO INS ANLO3 voltage2"]
-	return FaintParameter{Float64}(rate1,rate2,repeat1,repeat2, start1,start2,voltage1,voltage2)
+	voltage1 = hdr["ESO INS ANLO3 VOLTAGE1"]
+	voltage2 = hdr["ESO INS ANLO3 VOLTAGE2"]
+	state1 = start1 .+ rate1 .* (0:(repeat1-1))
+	state2 = start2 .+ rate2 .* (0:(repeat2-1))
+	return FaintStates(state1,state2,voltage1,voltage2)
 end
 
-function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintParameter} = nothing, keepraw = false,verb=false)
+function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false)
 	hdr = read_header(metrologyhdu)
 	table = Dict(metrologyhdu)
 	time = Float64.(table["TIME"]).*1e-6
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
-	(output, param,likelihood) = demodulateall(time, cmplxV)
+	(output, param,likelihood) = demodulateall(time, cmplxV; faintparam = faintparam)
 
 	if keepraw
 		s = similar(volt,80+64,size(volt,2))
@@ -160,7 +163,7 @@ function main(args)
 
 	for filename in files
 		if isfile(filename)
-			if endswith(filename,suffixes)
+			if endswith(filename,SUFFIXES)
 				pupmod=false
 				metmod="ON"
 				f= FITS(filename)

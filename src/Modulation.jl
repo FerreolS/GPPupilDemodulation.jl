@@ -5,27 +5,79 @@ using LinearAlgebra
 using OptimPackNextGen
 using StatsBase
 
-@enum side FT=0 SC=16
-@enum diode D1=1 D2=2 D3=3 D4=4 FC
+@enum Side FT=0 SC=16
+@enum Diode D1=1 D2=2 D3=3 D4=4 FC
+@enum MetState OFF=0 LOW=1 NORMAL=2 HIGH=3
+
 const ȷ=im
 
 
-function idx(side_::side,telescope_::Integer, diode_::diode) 
+function idx(side_::Side,telescope_::Integer, diode_::Diode) 
 	if diode_==FC
 		return 32 + Integer(side_)÷4  + (telescope_-1) + 1
 	end
 	return Integer(side_) + (Integer(diode_)-1) + (telescope_-1)*4 + 1 
 end
 
-struct FaintParameter{T<:AbstractFloat}
-	rate1::T
-	rate2::T
-	repeat1::Int64
-	repeat2::Int64
-	start1::T
-	start2::T
+struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
+	timer1::A
+	timer2::A
 	voltage1::T
 	voltage2::T
+	state1::MetState
+	state2::MetState
+end
+ 
+function  FaintStates(state1::AbstractVector{T},state2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
+	A = typeof(state1)
+	if  voltage1 > voltage2
+	 	return FaintStates{T,A}(state1,state2,voltage1,voltage2,LOW,HIGH)
+	end
+	return FaintStates{T,A}(state1,state2,voltage1,voltage2,HIGH, LOW)
+
+end
+
+function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}) where {T<:AbstractFloat,A<:AbstractVector{T}}
+	N = length(timestamp)
+	laststate = NORMAL
+	states = Vector{MetState}(undef,N)
+
+	t1 = collect(faintstates.timer1)
+	t2 = collect(faintstates.timer2)
+	first1 = popfirst!(t1)
+	first2 = popfirst!(t2)
+
+	@inbounds @simd for index ∈ 1:N
+		time = timestamp[index]
+		if time >= first1
+			if isempty(t1) 
+				first1 = last(timestamp)
+				laststate = faintstates.state1
+				if first2 == last(timestamp)
+					laststate = NORMAL
+				end
+			else
+				first1 = popfirst!(t1)
+				laststate = faintstates.state1
+			end
+		end
+
+		if time >= first2
+			if isempty(t2) 
+				first2 = last(timestamp)
+				laststate = faintstates.state2
+				if first1 == last(timestamp)
+					laststate = NORMAL
+				end
+			else
+				first2 = popfirst!(t2)
+				laststate = faintstates.state2
+			end
+		end
+
+		states[index] = laststate
+	end	
+	return states
 end
 
 mutable struct Modulation{T<:AbstractFloat}
@@ -142,7 +194,7 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
+function demodulateall( time::Vector{T},data::Matrix{Complex{T}};faintparam::Union{Nothing,FaintStates} = nothing, xinit=[0.01,0],recenter=true)   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 
@@ -151,7 +203,11 @@ function demodulateall( time::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0]
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
 		FCphase = angle.(data[:,idx(k,j,FC)])
 		for i ∈ (D1,D2,D3,D4)
-			d = view(data,:,idx(k,j,i)) .*  exp.(-1im.*FCphase)
+			if isnothing(faintparam)
+				d = view(data,:,idx(k,j,i)) .*  exp.(-1im.*FCphase)
+			else
+				d = nothing;
+			end
 			lkl = Chi2CostFunction(time,d )
 			if xinit==:auto
 				binit= initialguess(d)
