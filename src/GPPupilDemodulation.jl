@@ -8,6 +8,8 @@ import .FitsUtils: FITScopy!
 include("Modulation.jl")
 
 
+include("Faint.jl")
+
 using ArgParse, FITSIO
 
 const SUFFIXES = [".fits", ".fits.gz","fits.Z"]
@@ -63,13 +65,13 @@ function buildfaintparameters(hdr::FITSHeader)
 	return FaintStates(state1,state2,voltage1,voltage2)
 end
 
-function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false)
+function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false,onlyhigh=onlyhigh)
 	hdr = read_header(metrologyhdu)
 	table = Dict(metrologyhdu)
 	time = Float64.(table["TIME"]).*1e-6
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
-	(output, param,likelihood) = demodulateall(time, cmplxV; faintparam = faintparam)
+	(output, param,likelihood) = demodulateall(time, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
 
 	if keepraw
 		s = similar(volt,80+64,size(volt,2))
@@ -117,6 +119,9 @@ function main(args)
 			arg_type = String
 			default = [""]
             help = "Store the demodulated metrogoly in the INPUT.SUFFIX.fits file"
+		"--onlyhigh", "-o"
+			help = "Demodulate only on HIGH metrology  in faint mode"
+			action = :store_true
 		"--recursive", "-r"
 			help = "Recursively explore entire directories."
 			action = :store_true
@@ -195,11 +200,11 @@ function main(args)
 					end
 
 					if metmod == "FAINT"
-						faintparam = buildfaintparameters(f[1])
+						faintparam = buildfaintparameters(read_header(f[1]));
 					end
 
 					metrologyhdu = f["METROLOGY"]
-					(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"])
+					(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"],onlyhigh=parsed_args["onlyhigh"])
 					
 					tend = time()
 					if parsed_args["verbose"]
