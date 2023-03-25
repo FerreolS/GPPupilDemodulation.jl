@@ -1,7 +1,6 @@
 
 @enum MetState OFF=0 LOW=1 NORMAL=2 HIGH=3
-
-
+ 
 struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
 	timer1::A
 	timer2::A

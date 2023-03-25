@@ -8,7 +8,6 @@ import .FitsUtils: FITScopy!
 include("Modulation.jl")
 
 
-include("Faint.jl")
 
 using ArgParse, FITSIO
 
