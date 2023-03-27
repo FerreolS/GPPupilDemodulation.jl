@@ -184,11 +184,15 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
 end
 
 function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}}; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),timestamp,data,1.0)
+	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp,)data,T.(1.0))
 end
 
 function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}},power::Vector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,Vector{T}}(Modulation(;T=T,kwd...),timestamp,data,power)
+	return Chi2CostFunction{T,Vector{T}}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(power))
+end
+
+function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}},power::Number; kwd...) where {T<:AbstractFloat}
+	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(power))
 end
 
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
