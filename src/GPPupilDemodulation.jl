@@ -1,6 +1,6 @@
 module GPPupilDemodulation
 
-
+using Logging
 include("FitsUtils.jl")
 
 import .FitsUtils: FITScopy!
@@ -177,6 +177,11 @@ function main(args)
 		mkpath(folder)
 	end
 
+	if parsed_args["verbose"]
+		Logging.LogLevel(0)
+	else
+		Logging.LogLevel(2000)
+	end
 	for filename in files
 		if isfile(filename)
 			if endswith(filename,SUFFIXES)

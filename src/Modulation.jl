@@ -231,7 +231,7 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}};faintparam
 	if !isnothing(faintparam)
 		state= buildstates(faintparam, timestamp)
 		lag = estimatelag(state,data[:,33])
-		@info lag
+		@info "lag = $lag"
 		state= buildstates(faintparam, timestamp; lag=lag)
 	end
 
