@@ -177,10 +177,8 @@ function main(args)
 		mkpath(folder)
 	end
 
-	if parsed_args["verbose"]
-		Logging.LogLevel(0)
-	else
-		Logging.LogLevel(2000)
+	if !parsed_args["verbose"]
+		disable_logging(Logging.Info)
 	end
 	for filename in files
 		if isfile(filename)
