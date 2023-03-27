@@ -175,7 +175,6 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
 									power::P) where {T<:AbstractFloat,P<:Union{Vector{T}, T}}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
-		@show P
 		if P ==Vector{T}
 			@assert N == size(power,1) "power and time must have the same number of lines"
 			return new{T,Vector{T}}(N,mod,timestamp,data,power)
@@ -232,7 +231,7 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}};faintparam
 	if !isnothing(faintparam)
 		state= buildstates(faintparam, timestamp)
 		lag = estimatelag(state,data[:,33])
-		@show lag
+		@info lag
 		state= buildstates(faintparam, timestamp; lag=lag)
 	end
 
