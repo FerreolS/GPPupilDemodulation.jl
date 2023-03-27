@@ -170,16 +170,17 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
     data::Vector{Complex{T}}
     power::P
     function Chi2CostFunction{T,P}(mod::Modulation{T},
-        							timestamp::Vector,
+        							timestamp::Vector{T},
         							data::Vector{Complex{T}},
 									power::P) where {T<:AbstractFloat,P<:Union{Vector{T}, T}}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
-		if typeof(P)===Vector
+		@show P
+		if P ==Vector{T}
 			@assert N == size(power,1) "power and time must have the same number of lines"
-			return new{T,Vector{T}}(N,mod,convert.(T,timestamp),data,convert.(T,power))
+			return new{T,Vector{T}}(N,mod,timestamp,data,power)
 		end
-        return new{T,T}(N,mod,convert.(T,timestamp),data,power)
+        return new{T,T}(N,mod,timestamp,data,power)
     end
 end
 
