@@ -159,4 +159,32 @@ modulation phase  &      $\phi^+ $       &   \verb|DEMODULATION SIN PHASE|
     \caption{New keywords in the metrology table}
     \label{tab:keyword}
 \end{table}
+
+\section{Faint model}
+The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MODE| is set to \verb|FAINT|. In this case metrology laser is dimmed (the LOW state) during observations and maximized between the frame (the HIGH state) according to the keyword shown on table~\ref{tab:faint}.  This alternating HIGH/LOW state is shown on figure~\ref{fig:faint}. The firsts and the lasts few seconds 
+\begin{table}
+    \centering
+    \begin{tabular}{l c  l}
+        Keywords                    & unit  &    \\
+        \hline
+    \verb|ESO INS ANLO3 RATE1|      & second    &  Rate of repetition of the first state \\     
+    \verb|ESO INS ANLO3 RATE2|      & second    &  Rate of repetition of the second state \\	
+    \verb|ESO INS ANLO3 REPEAT1|    & Int       &  Number of repetition of the first state\\ 
+    \verb|ESO INS ANLO3 REPEAT2|    & Int       &  Number of repetition of the second state\\
+    \verb|ESO INS ANLO3 TIMER1|     & second (unix time) &  Starting time of the first state   \\
+    \verb|ESO INS ANLO3 TIMER2|     & second (unix time) &  Starting time of the second state \\
+	\verb|ESO INS ANLO3 VOLTAGE1|   & V         &  Voltage of the first state \\
+    \verb|ESO INS ANLO3 VOLTAGE2|   & V         &  Voltage of the second state
+    \end{tabular}
+    \caption{Keywords of the FAINT mode}
+    \label{tab:faint}
+\end{table}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figs/FaintStates.pdf}
+    \caption{Modulus of the T1 FT fiber coupler diode and the state of the metrology laser during a whole observation in FAINT mode.}
+    \label{fig:faint}
+\end{figure}
+
 \end{document}

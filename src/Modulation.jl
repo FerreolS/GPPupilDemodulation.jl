@@ -13,7 +13,7 @@ const ȷ=im
 #include("Faint.jl")
 
 
-@enum MetState OFF=0 LOW=1 NORMAL=2 HIGH=3
+@enum MetState OFF=0 LOW=1 NORMAL=2 HIGH=3 TRANSIENT=-1
  
 struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
 	timer1::A
@@ -26,52 +26,65 @@ end
  
 function  FaintStates(state1::AbstractVector{T},state2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
 	A = typeof(state1)
-	if  voltage1 > voltage2
-	 	return FaintStates{T,A}(state1,state2,voltage1,voltage2,LOW,HIGH)
+	if  voltage1 > voltage2  # LOW > HIGH
+	 	return FaintStates{T,A}(state2,state1,voltage2,voltage1,HIGH,LOW)
 	end
 	return FaintStates{T,A}(state1,state2,voltage1,voltage2,HIGH, LOW)
 
 end
 
-function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::Integer=0) where {T<:AbstractFloat,A<:AbstractVector{T}}
+function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::Integer=0,preswitchdelay =0,postwitchdelay =0) where {T<:AbstractFloat,A<:AbstractVector{T}}
 	N = length(timestamp)
-	laststate = NORMAL
 	states = Vector{MetState}(undef,N)
 	timestep = timestamp[2]-timestamp[1]
 	t1 = collect(faintstates.timer1 .+ lag*timestep)
 	t2 = collect(faintstates.timer2 .+ lag*timestep)
+
+	bounds(x) = floor(Int,x / (2*timestep)),ceil( Int, x / (2*timestep))
+	(premin,premax) = bounds(preswitchdelay)
+	(postmin,postmax) = bounds(postwitchdelay)
+
+	currentstate = NORMAL
 	first1 = popfirst!(t1)
 	first2 = popfirst!(t2)
 
 	@inbounds @simd for index ∈ 1:N
 		time = timestamp[index]
-		if time >= first1
+		forget = 0
+		# HIGH
+		if time >= first1  
+			currentstate = faintstates.state1
+			states[index-premin:index] .= TRANSIENT
+			forget = premax
 			if isempty(t1) 
 				first1 = last(timestamp)
-				laststate = faintstates.state1
 				if first2 == last(timestamp)
-					laststate = NORMAL
+					currentstate = NORMAL
 				end
 			else
 				first1 = popfirst!(t1)
-				laststate = faintstates.state1
 			end
 		end
-
+		# LOW
 		if time >= first2
+			currentstate = faintstates.state2
+			states[index-postmin:index] .= TRANSIENT
+			forget = postmax
 			if isempty(t2) 
 				first2 = last(timestamp)
-				laststate = faintstates.state2
 				if first1 == last(timestamp)
 					laststate = NORMAL
 				end
 			else
-				first2 = popfirst!(t2)
-				laststate = faintstates.state2
+			first2 = popfirst!(t2)
 			end
 		end
-
-		states[index] = laststate
+		if( forget>0)
+			states[index] = TRANSIENT
+			forget -=1
+		else
+			states[index] = currentstate
+		end
 	end	
 	return states
 end
@@ -175,7 +188,7 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
 									power::P) where {T<:AbstractFloat,P<:Union{Vector{T}, T}}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
-		if P ==Vector{T}
+		if P <: Vector
 			@assert N == size(power,1) "power and time must have the same number of lines"
 			return new{T,Vector{T}}(N,mod,timestamp,data,power)
 		end
@@ -221,7 +234,7 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}};faintparam::Union{Nothing,FaintStates} = nothing, xinit=[0.01,0],recenter=true,onlyhigh=false)   where{T<:AbstractFloat}
+function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0],recenter=true,faintparam::Union{Nothing,FaintStates} = nothing,onlyhigh=false,preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 
@@ -232,7 +245,7 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}};faintparam
 		state= buildstates(faintparam, timestamp)
 		lag = estimatelag(state,data[:,33])
 		@info "lag = $lag"
-		state= buildstates(faintparam, timestamp; lag=lag)
+		state= buildstates(faintparam, timestamp; lag=lag, preswitchdelay=preswitchdelay,postwitchdelay=postwitchdelay)
 	end
 
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
@@ -244,13 +257,13 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}};faintparam
 			else
 				power = 1.
 			end
-
+			valid = (:)
 			if !isnothing(faintparam) && onlyhigh
-				hgh =  (state.== HIGH)
-				lkl = Chi2CostFunction(timestamp[hgh],d[hgh],power[hgh])
-			else
-				lkl = Chi2CostFunction(timestamp,d,power)
+				valid =  (state.== HIGH)
+			elseif any(x-> x== TRANSIENT,state) 
+				valid =  (state .!= TRANSIENT)
 			end
+			lkl = Chi2CostFunction(timestamp[valid],d[valid],power[valid])
 
 			if xinit==:auto
 				binit= initialguess(d)
