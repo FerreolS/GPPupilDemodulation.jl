@@ -45,6 +45,18 @@ function Base.endswith(chains::Vector{String},pattern::AbstractString)
 	return false
 end
 
+"""
+    buildfaintparameters(hdr::FITSHeader)
+
+Extracts data from the FITS header `hdr` to build an instance of the `FaintStates` struct. 
+
+Parameters:
+- `hdr`: A FITS header object containing the necessary data.
+
+Returns:
+- An instance of the `FaintStates` struct initialized with the extracted data.
+"""
+
 function buildfaintparameters(hdr::FITSHeader)
 
 	mjdobs = hdr["MJD-OBS"]
@@ -59,9 +71,9 @@ function buildfaintparameters(hdr::FITSHeader)
 
 	voltage1 = hdr["ESO INS ANLO3 VOLTAGE1"]
 	voltage2 = hdr["ESO INS ANLO3 VOLTAGE2"]
-	state1 = start1 .+ rate1 .* (0:(repeat1-1))
-	state2 = start2 .+ rate2 .* (0:(repeat2-1))
-	return FaintStates(state1,state2,voltage1,voltage2)
+	timer1 = start1 .+ rate1 .* (0:(repeat1-1))
+	timer2 = start2 .+ rate2 .* (0:(repeat2-1))
+	return FaintStates(timer1,timer2,voltage1,voltage2)
 end
 
 function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false,onlyhigh=onlyhigh)

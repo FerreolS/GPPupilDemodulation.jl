@@ -10,12 +10,12 @@ struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
 	state2::MetState
 end
  
-function  FaintStates(state1::AbstractVector{T},state2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
-	A = typeof(state1)
+function  FaintStates(timer1::AbstractVector{T},timer2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
+	A = typeof(timer1)
 	if  voltage1 > voltage2
-	 	return FaintStates{T,A}(state1,state2,voltage1,voltage2,LOW,HIGH)
+	 	return FaintStates{T,A}(timer1,timer2,voltage1,voltage2,LOW,HIGH)
 	end
-	return FaintStates{T,A}(state1,state2,voltage1,voltage2,HIGH, LOW)
+	return FaintStates{T,A}(timer1,timer2,voltage1,voltage2,HIGH, LOW)
 
 end
 
@@ -62,6 +62,26 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::In
 	return states
 end
 
+"""
+    estimatelag(states::Vector{MetState} ,data::Vector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
+	
+    Estimate the lag between the states and a given complex data array.
+
+    Parameters
+    ----------
+    states : Vector{MetState}
+        Array of MetState representing the state at each time.
+    data : Vector{Complex{T}}
+        Complex data array for which the lag will be estimated.
+    range : AbstractVector{Int64}
+        Range of possible lags to be tested. Default is -10:10.
+
+    Returns
+    -------
+    lag : Int64
+        The estimated lag value.
+    
+"""
 function estimatelag(states::Vector{MetState} ,data::Vector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
 	m = [mean(abs2,data[circshift(states,i) .== HIGH]) for i ∈ range];
 	return range[argmax(m)]

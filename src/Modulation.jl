@@ -172,13 +172,14 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
     function Chi2CostFunction{T,P}(mod::Modulation{T},
         							timestamp::Vector,
         							data::Vector{Complex{T}},
-									power::P) where {T<:AbstractFloat,P<:Union{Vector, T}}
+									power::P) where {T<:AbstractFloat,P<:Union{Vector{T}, T}}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
-		if typeof(P)===Vector{T}
+		if typeof(P)===Vector
 			@assert N == size(power,1) "power and time must have the same number of lines"
+			return new{T,Vector{T}}(N,mod,convert.(T,timestamp),data,convert.(T,power))
 		end
-        return new{T,P}(N,mod,convert.(T,timestamp),data,convert.(T,power))
+        return new{T,T}(N,mod,convert.(T,timestamp),data,power)
     end
 end
 
@@ -193,10 +194,6 @@ end
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
 	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data, b, ϕ)
 	return sum(abs2,( pupilmodulation .- self.data))
-end
-
-function Chi2CostFunction(pupilmodulation::Vector{Complex{T}},timestamp::Vector,data::Vector{Complex{T}}; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T}(pupilmodulation,Modulation(;T=T,kwd...),timestamp,data)
 end
 
 function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
