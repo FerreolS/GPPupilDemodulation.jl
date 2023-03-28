@@ -83,7 +83,7 @@ function compute_mean_power(states::Vector{MetState} ,data::AbstractVector{Compl
 	pow = zeros(T,length(data))
 	 for st ∈ instances(MetState)
 		idx = states.==st
-		pow[idx] .= mean(abs2,data[idx]);
+		pow[idx] .= mean(abs,data[idx]);
 	 end
 	 return pow
 end
