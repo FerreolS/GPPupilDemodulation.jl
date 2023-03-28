@@ -33,7 +33,7 @@ function  FaintStates(state1::AbstractVector{T},state2::AbstractVector{T},voltag
 
 end
 
-function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::Integer=0,preswitchdelay =0,postwitchdelay =0) where {T<:AbstractFloat,A<:AbstractVector{T}}
+function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; lag::Integer=0,preswitchdelay =0,postwitchdelay =0) where {T<:AbstractFloat,A<:AbstractVector{T}}
 	N = length(timestamp)
 	states = Vector{MetState}(undef,N)
 	timestep = timestamp[2]-timestamp[1]
@@ -73,7 +73,7 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::In
 			if isempty(t2) 
 				first2 = last(timestamp)
 				if first1 == last(timestamp)
-					laststate = NORMAL
+					currentstate = NORMAL
 				end
 			else
 			first2 = popfirst!(t2)
@@ -89,7 +89,7 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::In
 	return states
 end
 
-function estimatelag(states::Vector{MetState} ,data::Vector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
+function estimatelag(states::Vector{MetState} ,data::AbstractVector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
 	m = [mean(abs2,data[circshift(states,i) .== HIGH]) for i ∈ range];
 	return range[argmax(m)]
 end
@@ -126,17 +126,17 @@ function Modulation{T}(mod::Modulation) where{T<:AbstractFloat}
 	return Modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
 end
 
-function (self::Modulation{T})(timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
+function (self::Modulation{T})(timestamp::AbstractVector) where{T<:AbstractFloat,}
 	timestamp = T.(timestamp)
 	return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
 end
 
-function getphase(self::Modulation{T},timestamp::Vector{T2}) where{T<:AbstractFloat,T2}
+function getphase(self::Modulation{T},timestamp::AbstractVector) where{T<:AbstractFloat}
 	timestamp = T.(timestamp)
 	return self.b .* sin.( self.ω .* timestamp .+ self.ϕ ) .+ angle(self.a)
 end
 
-function updatemodulation(self::Modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation(self::Modulation{T}, timestamp::AbstractVector, data::AbstractVector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -144,12 +144,12 @@ function updatemodulation(self::Modulation{T}, timestamp::Vector{T}, data::Vecto
 		self.a = mean(data)
 		return self.a .* ones(Complex{T},size(data))
 	end
-	model = exp.(ȷ .* (b .* sin.( self.ω .* timestamp .+ ϕ )))
+	model = exp.(ȷ .* (b .* sin.( self.ω .* T.(timestamp) .+ ϕ )))
 	(self.c, self.a) = linearregression( model, data)
 	return 	self.c .+ self.a .* model
 end
 
-function updatemodulation!( model::Vector{Complex{T}}, self::Modulation{T}, timestamp::Vector{T}, data::Vector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::AbstractVector, data::AbstractVector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -164,7 +164,7 @@ function updatemodulation!( model::Vector{Complex{T}}, self::Modulation{T}, time
 	return model
 end
 
-function linearregression( model::Vector{Complex{T}}, data::Vector{Complex{T}}) where{T<:AbstractFloat}
+function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
 	N = length(model)
 	Sv1 = sum(data)
 	Sv2 = model ⋅ data
@@ -196,15 +196,15 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
     end
 end
 
-function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}}; kwd...) where {T<:AbstractFloat}
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}}; kwd...) where {T<:AbstractFloat}
 	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp,)data,T.(1.0))
 end
 
-function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}},power::Vector; kwd...) where {T<:AbstractFloat}
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::Vector; kwd...) where {T<:AbstractFloat}
 	return Chi2CostFunction{T,Vector{T}}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(power))
 end
 
-function Chi2CostFunction(timestamp::Vector,data::Vector{Complex{T}},power::Number; kwd...) where {T<:AbstractFloat}
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::Number; kwd...) where {T<:AbstractFloat}
 	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(power))
 end
 
@@ -213,14 +213,14 @@ function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
 	return sum(abs2,( pupilmodulation .- self.data))
 end
 
-function (self::Chi2CostFunction{T})(pupilmodulation::Vector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
-	updatemodulation!(pupilmodulation, self.mod, self.timestamp, self.data, b, ϕ)
+function (self::Chi2CostFunction{T})(pupilmodulation::AbstractVector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
+	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data, b, ϕ)
 	return sum(abs2,( self.power .* pupilmodulation .-  self.data))
 end
 
 (self::Chi2CostFunction{T})() where{T<:AbstractFloat}  = self(self.mod.b,self.mod.ϕ)
 (self::Chi2CostFunction{T})(x::Vector{T}) where{T<:AbstractFloat}  = self(x[1],x[2])
-(self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::Vector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2])
+(self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::AbstractVector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2])
 
 function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFloat}
 	scratch =Vector{Complex{T}}(undef,self.N)
@@ -234,7 +234,7 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}}; xinit=[0.01,0],recenter=true,faintparam::Union{Nothing,FaintStates} = nothing,onlyhigh=false,preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
+function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; xinit=[0.01,0],recenter=true,faintparam::Union{Nothing,FaintStates} = nothing,onlyhigh=false,preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 
@@ -243,7 +243,7 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}}; xinit=[0.
 
 	if !isnothing(faintparam)
 		state= buildstates(faintparam, timestamp)
-		lag = estimatelag(state,data[:,33])
+		lag = estimatelag(state,data[:,idx(SC,1,FC)])
 		@info "lag = $lag"
 		state= buildstates(faintparam, timestamp; lag=lag, preswitchdelay=preswitchdelay,postwitchdelay=postwitchdelay)
 	end
@@ -252,18 +252,19 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}}; xinit=[0.
 		FCphase = angle.(data[:,idx(k,j,FC)])
 		for i ∈ (D1,D2,D3,D4)
 			d = view(data,:,idx(k,j,i)) .*  exp.(-1im.*FCphase)
-			if !isnothing(faintparam)
-				power = compute_mean_power(state,view(data,:,idx(k,j,i)))
-			else
-				power = 1.
-			end
 			valid = (:)
-			if !isnothing(faintparam) && onlyhigh
-				valid =  (state.== HIGH)
-			elseif any(x-> x== TRANSIENT,state) 
-				valid =  (state .!= TRANSIENT)
+			if !isnothing(faintparam) 
+				if onlyhigh
+					valid =  (state.== HIGH)
+				end
+				if any(x-> x == TRANSIENT,state) 
+					valid =  (state .!= TRANSIENT)
+				end
+				power = compute_mean_power(state,view(data,:,idx(k,j,i)))[valid]
+			else
+				power = T.(1.)
 			end
-			lkl = Chi2CostFunction(timestamp[valid],d[valid],power[valid])
+			lkl = Chi2CostFunction(timestamp[valid],d[valid],power)
 
 			if xinit==:auto
 				binit= initialguess(d)
@@ -283,6 +284,6 @@ function demodulateall( timestamp::Vector{T},data::Matrix{Complex{T}}; xinit=[0.
 	return (output, param,likelihood)
 end
 
-function initialguess(data::Vector{Complex{T}}) where{T<:AbstractFloat}
+function initialguess(data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
 	std(angle.(data .* exp.(-1ȷ .*angle(mean(data)))))
 end

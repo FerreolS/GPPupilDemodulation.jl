@@ -1,5 +1,4 @@
-
-@enum MetState OFF=0 LOW=1 NORMAL=2 HIGH=3
+@enum MetState OFF=0 LOW=1 NORMAL=2 HIGH=3 TRANSIENT=-1
  
 struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
 	timer1::A
@@ -10,79 +9,72 @@ struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
 	state2::MetState
 end
  
-function  FaintStates(timer1::AbstractVector{T},timer2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
-	A = typeof(timer1)
-	if  voltage1 > voltage2
-	 	return FaintStates{T,A}(timer1,timer2,voltage1,voltage2,LOW,HIGH)
+function  FaintStates(state1::AbstractVector{T},state2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
+	A = typeof(state1)
+	if  voltage1 > voltage2  # LOW > HIGH
+	 	return FaintStates{T,A}(state2,state1,voltage2,voltage1,HIGH,LOW)
 	end
-	return FaintStates{T,A}(timer1,timer2,voltage1,voltage2,HIGH, LOW)
+	return FaintStates{T,A}(state1,state2,voltage1,voltage2,HIGH, LOW)
 
 end
 
-function buildstates(faintstates::FaintStates{T,A},timestamp::Vector{T}; lag::Integer=0) where {T<:AbstractFloat,A<:AbstractVector{T}}
+function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; lag::Integer=0,preswitchdelay =0,postwitchdelay =0) where {T<:AbstractFloat,A<:AbstractVector{T}}
 	N = length(timestamp)
-	laststate = NORMAL
 	states = Vector{MetState}(undef,N)
 	timestep = timestamp[2]-timestamp[1]
 	t1 = collect(faintstates.timer1 .+ lag*timestep)
 	t2 = collect(faintstates.timer2 .+ lag*timestep)
+
+	bounds(x) = floor(Int,x / (2*timestep)),ceil( Int, x / (2*timestep))
+	(premin,premax) = bounds(preswitchdelay)
+	(postmin,postmax) = bounds(postwitchdelay)
+
+	currentstate = NORMAL
 	first1 = popfirst!(t1)
 	first2 = popfirst!(t2)
 
 	@inbounds @simd for index ∈ 1:N
 		time = timestamp[index]
-		if time >= first1
+		forget = 0
+		# HIGH
+		if time >= first1  
+			currentstate = faintstates.state1
+			states[index-premin:index] .= TRANSIENT
+			forget = premax
 			if isempty(t1) 
 				first1 = last(timestamp)
-				laststate = faintstates.state1
 				if first2 == last(timestamp)
-					laststate = NORMAL
+					currentstate = NORMAL
 				end
 			else
 				first1 = popfirst!(t1)
-				laststate = faintstates.state1
 			end
 		end
-
+		# LOW
 		if time >= first2
+			currentstate = faintstates.state2
+			states[index-postmin:index] .= TRANSIENT
+			forget = postmax
 			if isempty(t2) 
 				first2 = last(timestamp)
-				laststate = faintstates.state2
 				if first1 == last(timestamp)
-					laststate = NORMAL
+					currentstate = NORMAL
 				end
 			else
-				first2 = popfirst!(t2)
-				laststate = faintstates.state2
+			first2 = popfirst!(t2)
 			end
 		end
-
-		states[index] = laststate
+		if( forget>0)
+			states[index] = TRANSIENT
+			forget -=1
+		else
+			states[index] = currentstate
+		end
 	end	
 	return states
 end
 
-"""
-    estimatelag(states::Vector{MetState} ,data::Vector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
-	
-    Estimate the lag between the states and a given complex data array.
-
-    Parameters
-    ----------
-    states : Vector{MetState}
-        Array of MetState representing the state at each time.
-    data : Vector{Complex{T}}
-        Complex data array for which the lag will be estimated.
-    range : AbstractVector{Int64}
-        Range of possible lags to be tested. Default is -10:10.
-
-    Returns
-    -------
-    lag : Int64
-        The estimated lag value.
-    
-"""
-function estimatelag(states::Vector{MetState} ,data::Vector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
+function estimatelag(states::Vector{MetState} ,data::AbstractVector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
 	m = [mean(abs2,data[circshift(states,i) .== HIGH]) for i ∈ range];
 	return range[argmax(m)]
 end
