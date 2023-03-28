@@ -161,7 +161,7 @@ modulation phase  &      $\phi^+ $       &   \verb|DEMODULATION SIN PHASE|
 \end{table}
 
 \section{Faint model}
-The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MODE| is set to \verb|FAINT|. In this case metrology laser is dimmed (the LOW state) during observations and maximized between the frame (the HIGH state) according to the keyword shown on table~\ref{tab:faint}.  This alternating HIGH/LOW state is shown on figure~\ref{fig:faint}. The firsts and the lasts few seconds 
+
 \begin{table}
     \centering
     \begin{tabular}{l c  l}
@@ -180,6 +180,19 @@ The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MOD
     \label{tab:faint}
 \end{table}
 
+The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MODE| is set to \verb|FAINT|. In this case metrology laser is dimmed (the LOW state) during observations and maximized between the frame (the HIGH state) according to the keyword shown on table~\ref{tab:faint}.  This alternating HIGH/LOW state is shown on figure~\ref{fig:faint}. In the firsts and the lasts second the metrology power is in NORMAL state.
+
+In FAINT mode the equation \ref{eq:model} is rewritten as:
+\begin{equation}
+    \V{d} = \left( c + \V{p} \times  \V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
+\end{equation}
+with the additional factor $p_k$ that is the expected laser power at row $k$. This vector is filled with   mean of the modulus of the data $V{d}$  for each state. In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
+\begin{equation}
+    (c^+, a^+, b^+, \phi^+) = \argmin_{c,a,b,\phi} \Norm{\V{r} -  c - \V{p} \times a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right) }_2^2\label{eq:rfaint}
+\end{equation}
+
+
+
 \begin{figure}
     \centering
     \includegraphics[width=0.8\linewidth]{figs/FaintStates.pdf}
@@ -187,4 +200,21 @@ The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MOD
     \label{fig:faint}
 \end{figure}
 
+
+As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual diming/brightening of the laser. This lag is automatically estimated and corrected in the Julia code. 
+In addition, there is also a 10ms transient before the laser power stabilizes. Several test were perform with pre/post-switching delay and it does not seems to have measurable impact on the demodulation.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\linewidth]{figs/FaintStatesZoom.pdf}
+    \caption{Zoom on the modulus of the T1 FT fiber coupler diode and the state of the metrology laser when the laser is switching to HIGH.}
+    \label{fig:faintzoom}
+\end{figure}
+
+An example on demodulated phase signal is shown on figure~\ref{fig:FaintDemodulated}.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figs/FaintDemodulated.pdf}
+    \caption{Zoom around a HIGH state of the phase of the diode D1 of T1 SC and its demodulation.}
+    \label{fig:FaintDemodulated}
+\end{figure}
 \end{document}
