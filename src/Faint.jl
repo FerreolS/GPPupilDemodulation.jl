@@ -75,7 +75,7 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; la
 end
 
 function estimatelag(states::Vector{MetState} ,data::AbstractVector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
-	m = [mean(abs2,data[circshift(states,i) .== HIGH]) for i ∈ range];
+	m = [mean(abs,data[circshift(states,i) .== HIGH]) for i ∈ range];
 	return range[argmax(m)]
 end
 
