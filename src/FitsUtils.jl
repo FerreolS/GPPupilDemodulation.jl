@@ -11,7 +11,18 @@ Base.names(hdu::TableHDU) = FITSIO.colnames(hdu)
 
 extver(hdu::HDU) = FITSIO.fits_try_read_extver(hdu.fitsfile)
 
-
+function getunits(hdr::FITSHeader)
+	col_units = Dict{String,String}()
+	if !haskey(hdr, "TFIELDS") return nothing
+	end
+	ncol = hdr["TFIELDS"]
+	for i ∈ 1:ncol
+		if haskey(hdr, "TUNIT$i") 
+			push!(col_units,hdr["TTYPE$i"] => hdr["TUNIT$i"])
+		end
+	end
+	return col_units
+end
 
 # function rewind(file::FITSFile)
 # 	fits_movabs_hdu(f::FITSFile, 1)
@@ -75,20 +86,25 @@ end
 function FITScopy!(dst::FITS,
 		src::FITS,
 		content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}},
-		header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}} ) where {M,N,T1<:AbstractDict,T2<:AbstractArray} 
+		header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}};
+		units=units ) where {M,N,T1<:AbstractDict,T2<:AbstractArray} 
 	 
 	Dcontent = Dict(content)
 	Dheader = Dict(header)
 	hdr=nothing
+	cunits = nothing
+
 	for hdu ∈ src
 		hduname =name(hdu)
 
 		hdr = pop!(Dheader,hduname,read_header(hdu))
 		
 		if haskey(Dcontent,hduname)
-			cntnt = pop!(Dcontent,hduname)			
+			cntnt = pop!(Dcontent,hduname)
+			cunits=units			
 		else
 			if isa(hdu,TableHDU)
+				@show cunits = getunits(hdr)
 				cntnt = Dict(hdu)
 			elseif isa(hdu, ImageHDU) 
 				if (size(hdu) == ())
@@ -98,12 +114,17 @@ function FITScopy!(dst::FITS,
 				end
 			end
 		end
-		
-		write(dst,cntnt;header=hdr,name=hduname,ver=extver(hdu))
+		if isa(hdu,TableHDU)
+			write(dst,cntnt;header=hdr,name=hduname,ver=extver(hdu),units=cunits)
+		else
+			write(dst,cntnt;header=hdr,name=hduname,ver=extver(hdu))
+		end
 	end
 	for (key,cntnt) ∈ Dcontent
+		@show key
 		hdr = pop!(Dheader,key,nothing)
-		write(dst,cntnt;header=hdr,name=key)
+		@show units
+		write(dst,cntnt;header=hdr,name=key,units=units)
 		delete!(Dcontent,key)
 	end
 	

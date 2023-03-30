@@ -15,6 +15,7 @@ const SUFFIXES = [".fits", ".fits.gz","fits.Z"]
 const MJD_1970_1_1 = 40587.0
 const DAY_TO_SEC = 24*60*60 
 
+const units = Dict("TIME"=>"usec","VOLT"  => "V", "POWER_LASER" => "mV", "LAMBDA_LASER" => "m", "FLAG"=>"-")
 """
 	endswith(chain::Union{String,Vector{String}}, pattern::Vector{String})
 
@@ -229,7 +230,8 @@ function main(args)
 					close(f)
 					f= FITS(filename)
 					g = FITS(outname, "w")
-					FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr)
+					
+					FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr,units=units)
 					close(g)
 
 					if parsed_args["verbose"]
