@@ -116,10 +116,8 @@ function FITScopy!(dst::FITS,
 		
 		if haskey(Dcontent,hduname)
 			cntnt = pop!(Dcontent,hduname)
-			cunits=units			
 		else
 			if isa(hdu,TableHDU)
-				cunits = getunits(hdr)
 				cntnt = Dict(hdu)
 			elseif isa(hdu, ImageHDU) 
 				if (size(hdu) == ())
@@ -130,6 +128,11 @@ function FITScopy!(dst::FITS,
 			end
 		end
 		if isa(hdu,TableHDU)
+			if haskey(Dunits,hduname)
+				cunits = pop!(Dcontent,hduname)
+			else
+				cunits = getunits(hdr)
+			end
 			write(dst,cntnt;header=hdr,name=hduname,ver=extver(hdu),units=cunits)
 		else
 			write(dst,cntnt;header=hdr,name=hduname,ver=extver(hdu))
@@ -138,8 +141,7 @@ function FITScopy!(dst::FITS,
 	for (key,cntnt) ∈ Dcontent
 		@show key
 		hdr = pop!(Dheader,key,nothing)
-		@show units
-		write(dst,cntnt;header=hdr,name=key,units=units)
+		write(dst,cntnt;header=hdr,name=key)
 		delete!(Dcontent,key)
 	end
 	
