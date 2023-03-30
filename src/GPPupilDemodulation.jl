@@ -231,7 +231,7 @@ function main(args)
 					f= FITS(filename)
 					g = FITS(outname, "w")
 					
-					FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr,units=units)
+					FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr)
 					close(g)
 
 					if parsed_args["verbose"]

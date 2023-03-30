@@ -86,11 +86,26 @@ end
 function FITScopy!(dst::FITS,
 		src::FITS,
 		content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}},
-		header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}};
-		units=units ) where {M,N,T1<:AbstractDict,T2<:AbstractArray} 
+		header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}}) where {M,N,T1<:AbstractDict,T2<:AbstractArray} 
+ 
+		FITScopy!(dst,src,content,header,nothing)
+	end
+	
+	
+	function FITScopy!(dst::FITS,
+			src::FITS,
+			content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}},
+			header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}},
+			units::Union{Nothing,Pair{String,Dict{String,String}},NTuple{O,Pair{String,Dict{String,String}}}} ) where {M,N,O,T1<:AbstractDict,T2<:AbstractArray} 	
 	 
 	Dcontent = Dict(content)
 	Dheader = Dict(header)
+	if isnothing(units)
+		Dunits = Dict()
+	else
+		Dunits = Dict(units)
+	end
+
 	hdr=nothing
 	cunits = nothing
 
@@ -104,7 +119,7 @@ function FITScopy!(dst::FITS,
 			cunits=units			
 		else
 			if isa(hdu,TableHDU)
-				@show cunits = getunits(hdr)
+				cunits = getunits(hdr)
 				cntnt = Dict(hdu)
 			elseif isa(hdu, ImageHDU) 
 				if (size(hdu) == ())
