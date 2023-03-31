@@ -1,6 +1,6 @@
 module GPPupilDemodulation
 
-using Logging
+using Logging, Pkg
 include("FitsUtils.jl")
 
 import .FitsUtils: FITScopy!
@@ -180,6 +180,9 @@ function main(args)
 
 	if !parsed_args["verbose"]
 		disable_logging(Logging.Info)
+	else
+		
+		Pkg.status("FITSIO")
 	end
 	for filename in files
 		if isfile(filename)
