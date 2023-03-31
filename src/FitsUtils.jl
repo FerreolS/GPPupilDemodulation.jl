@@ -139,7 +139,6 @@ function FITScopy!(dst::FITS,
 		end
 	end
 	for (key,cntnt) ∈ Dcontent
-		@show key
 		hdr = pop!(Dheader,key,nothing)
 		write(dst,cntnt;header=hdr,name=key)
 		delete!(Dcontent,key)

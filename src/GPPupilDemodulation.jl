@@ -143,9 +143,9 @@ function main(args)
 		"--keepraw", "-k"
 			help = "keep raw"
 			action = :store_true
-		"--overwrite", "-w"
-			help = "overwrite the original file"
-			action = :store_true
+		# "--overwrite", "-w"
+		# 	help = "overwrite the original file"
+		# 	action = :store_true
 		"--dir", "-d"
 			nargs = 1
 			action = :store_arg
