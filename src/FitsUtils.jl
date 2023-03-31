@@ -1,17 +1,14 @@
 module FitsUtils
 import Base: Dict, names, write
 
-import CFITSIO: FITSFile, bitpix_from_type,libcfitsio,fits_assert_ok,fits_update_key,fits_movabs_hdu
-using FITSIO
-#import FITSIO: fits_create_img
+using EasyFITS
 
-name(hdu::HDU) = FITSIO.fits_try_read_extname(hdu.fitsfile)
 
-Base.names(hdu::TableHDU) = FITSIO.colnames(hdu)
+name(hdu::FitsHDU) = hdu["EXTNAME"].value(String)
 
-extver(hdu::HDU) = FITSIO.fits_try_read_extver(hdu.fitsfile)
+extver(hdu::FitsHDU) = hdu["EXTVER"].value(Integer)
 
-function getunits(hdr::FITSHeader)
+function getunits(hdr::FitsHeader)
 	col_units = Dict{String,String}()
 	if !haskey(hdr, "TFIELDS") return nothing
 	end
@@ -28,7 +25,7 @@ end
 # 	fits_movabs_hdu(f::FITSFile, 1)
 # end
 
-function Base.Dict(hdu::TableHDU) 
+function Base.Dict(hdu::FitsTableHDU) 
 	D = Dict{String,Any}()
 	for name ∈ names(hdu)
 		push!(D,name => read(hdu,name))
@@ -37,7 +34,7 @@ function Base.Dict(hdu::TableHDU)
 end
 
 # Borrowed from https://github.com/JuliaAstro/CFITSIO.jl/issues/19
-function fits_create_empty_hdu(f::FITSFile)
+function fits_create_empty_hdu(f::FitsFile)
 
     status = Ref{Cint}(0)
     naxesr = C_NULL
@@ -58,44 +55,44 @@ function fits_create_empty_hdu(f::FITSFile)
     fits_assert_ok(status[])
 end
 
-Base.write(f::FITS, Nothing; kwds...) = write(f;kwds...)
+# Base.write(f::FitsFile, Nothing; kwds...) = write(f;kwds...)
 
-function Base.write(f::FITS;
-	header::Union{Nothing, FITSHeader}=nothing,
-	name::Union{Nothing, String}=nothing,
-	ver::Union{Nothing, Integer}=nothing)
-    status = fits_create_empty_hdu(f.fitsfile)
+# function Base.write(f::FitsFile;
+# 	header::Union{Nothing, FitsHeader}=nothing,
+# 	name::Union{Nothing, String}=nothing,
+# 	ver::Union{Nothing, Integer}=nothing)
+#     status = fits_create_empty_hdu(f.fitsfile)
 
-    if isa(header, FITSHeader)
-        FITSIO.fits_write_header(f.fitsfile, header, true)
-    end
-    if isa(name, String)
-        fits_update_key(f.fitsfile, "EXTNAME", name)
-    end
-    if isa(ver, Integer)
-        fits_update_key(f.fitsfile, "EXTVER", ver)
-    end
-    nothing
-end
+#     if isa(header, FitsHeader)
+#         FITSIO.fits_write_header(f.fitsfile, header, true)
+#     end
+#     if isa(name, String)
+#         fits_update_key(f.fitsfile, "EXTNAME", name)
+#     end
+#     if isa(ver, Integer)
+#         fits_update_key(f.fitsfile, "EXTVER", ver)
+#     end
+#     nothing
+# end
 
-FITScopy!(dst::FITS,src::FITS) = FITScopy!(dst,src,(),())
-function FITScopy!(dst::FITS,src::FITS,content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}})  where {N,T1<:AbstractDict,T2<:AbstractArray} 
+FITScopy!(dst::FitsFile,src::FitsFile) = FITScopy!(dst,src,(),())
+function FITScopy!(dst::FitsFile,src::FitsFile,content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}})  where {N,T1<:AbstractDict,T2<:AbstractArray} 
     FITScopy!(dst,src,content,())
 end
 
-function FITScopy!(dst::FITS,
-		src::FITS,
+function FITScopy!(dst::FitsFile,
+		src::FitsFile,
 		content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}},
-		header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}}) where {M,N,T1<:AbstractDict,T2<:AbstractArray} 
+		header::Union{Pair{String,FitsHeader},NTuple{M,Pair{String,FitsHeader}}}) where {M,N,T1<:AbstractDict,T2<:AbstractArray} 
  
 		FITScopy!(dst,src,content,header,nothing)
 	end
 	
 	
-	function FITScopy!(dst::FITS,
-			src::FITS,
+	function FITScopy!(dst::FitsFile,
+			src::FitsFile,
 			content::Union{Pair{String,Union{T1,T2}},NTuple{N,Pair{String,Union{T1,T2}}}},
-			header::Union{Pair{String,FITSHeader},NTuple{M,Pair{String,FITSHeader}}},
+			header::Union{Pair{String,FitsHeader},NTuple{M,Pair{String,FitsHeader}}},
 			units::Union{Nothing,Pair{String,Dict{String,String}},NTuple{O,Pair{String,Dict{String,String}}}} ) where {M,N,O,T1<:AbstractDict,T2<:AbstractArray} 	
 	 
 	Dcontent = Dict(content)

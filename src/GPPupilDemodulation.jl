@@ -9,7 +9,7 @@ include("Modulation.jl")
 
 
 
-using ArgParse, FITSIO
+using ArgParse, EasyFITS
 
 const SUFFIXES = [".fits", ".fits.gz","fits.Z"]
 const MJD_1970_1_1 = 40587.0
@@ -47,7 +47,7 @@ function Base.endswith(chains::Vector{String},pattern::AbstractString)
 end
 
 """
-    buildfaintparameters(hdr::FITSHeader)
+    buildfaintparameters(hdr::FitsHeader)
 
 Extracts data from the FITS header `hdr` to build an instance of the `FaintStates` struct. 
 
@@ -58,29 +58,29 @@ Returns:
 - An instance of the `FaintStates` struct initialized with the extracted data.
 """
 
-function buildfaintparameters(hdr::FITSHeader)
+function buildfaintparameters(hdr::FitsHeader)
 
-	mjdobs = hdr["MJD-OBS"]
-	rate1 = hdr["ESO INS ANLO3 RATE1"]
-	rate2 = hdr["ESO INS ANLO3 RATE2"]
+	mjdobs = hdr["MJD-OBS"].value()
+	rate1 = hdr["ESO INS ANLO3 RATE1"].value()
+	rate2 = hdr["ESO INS ANLO3 RATE2"].value()
 
-	repeat1 = hdr["ESO INS ANLO3 REPEAT1"]
-	repeat2 = hdr["ESO INS ANLO3 REPEAT2"]
+	repeat1 = hdr["ESO INS ANLO3 REPEAT1"].value()
+	repeat2 = hdr["ESO INS ANLO3 REPEAT2"].value()
 
-	start1 = hdr["ESO INS ANLO3 TIMER1"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
-	start2 = hdr["ESO INS ANLO3 TIMER2"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
+	start1 = hdr["ESO INS ANLO3 TIMER1"].value() - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
+	start2 = hdr["ESO INS ANLO3 TIMER2"].value() - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
 
-	voltage1 = hdr["ESO INS ANLO3 VOLTAGE1"]
-	voltage2 = hdr["ESO INS ANLO3 VOLTAGE2"]
+	voltage1 = hdr["ESO INS ANLO3 VOLTAGE1"].value()
+	voltage2 = hdr["ESO INS ANLO3 VOLTAGE2"].value()
 	timer1 = start1 .+ rate1 .* (0:(repeat1-1))
 	timer2 = start2 .+ rate2 .* (0:(repeat2-1))
 	return FaintStates(timer1,timer2,voltage1,voltage2)
 end
 
-function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false,onlyhigh=onlyhigh)
-	hdr = read_header(metrologyhdu)
+function processmetrology(metrologyhdu::FitsTableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false,onlyhigh=false)
+	hdr = FitsHeader(metrologyhdu)
 	table = Dict(metrologyhdu)
-	time = Float64.(table["TIME"]).*1e-6
+	time = table["TIME"].*1e-6
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
 	(output, param,likelihood) = demodulateall(time, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
@@ -97,7 +97,7 @@ function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,Faint
 	end
 	table["VOLT"] = Float32.(volt)
 
-	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
+	hdr["PROCSOFT"] = ("GPPupilDemodulation.jl", "software used for demodulation")
 	for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
 		b = param[idx(i,j,k)].b
 		ϕ = param[idx(i,j,k)].ϕ
@@ -105,12 +105,12 @@ function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,Faint
 			b = -b
 			ϕ = rem2pi(ϕ+π,RoundNearest) 
 		end
-		setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i T$j $k")
-		setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i T$j $k")
-		setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i T$j $k")
-		setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i T$j $k")
-		setindex!(hdr,b,"DEMODULATION SIN AMPLITUDE $i T$j $k")
-		setindex!(hdr,ϕ,"DEMODULATION SIN PHASE $i T$j $k")
+		hdr["DEMODULATION CENTER X0 $i T$j $k"] = (real(param[idx(i,j,k)].c), "Pupil center in X from the metrology" )
+		hdr["DEMODULATION CENTER Y0 $i T$j $k"] = (imag(param[idx(i,j,k)].c), "Pupil center in Y from the metrology")
+		hdr["DEMODULATION AMPLITUDE ABS $i T$j $k"] = (abs(param[idx(i,j,k)].a), "mean modulus of the metrology")
+		hdr["DEMODULATION AMPLITUDE ARG $i T$j $k"] = (angle(param[idx(i,j,k)].a),"mean phase of the metrology")
+		hdr["DEMODULATION SIN AMPLITUDE $i T$j $k"] = (b,"amplitude of the modulation")
+		hdr["DEMODULATION SIN PHASE $i T$j $k"] = (ϕ,"phase of the modulation")
 	end
 	return (table, hdr) 
 end
@@ -186,62 +186,67 @@ function main(args)
 			if endswith(filename,SUFFIXES)
 				pupmod=false
 				metmod="ON"
-				f= FITS(filename)
-				try (pupmod,) = read_key(f[1],"ESO INS PMC1 MODULATE")
+				f=  openfits(filename)
+				try (pupmod,) = f[1]["ESO INS PMC1 MODULATE"].value()
 				catch
 					if parsed_args["verbose"]
 						println("no ESO INS PMC1 MODULATE keyword in $filename")
 					end
-					continue
-				end		
-				if pupmod
-					faintparam =  nothing
-					if parsed_args["verbose"]
-						println("Processing  $filename")
-					end
-					tstart = time()
-
-					try (metmod,) = read_key(f[1],"ESO INS MET MODE")
-						if parsed_args["verbose"]
-							println("$filename use $metmod metrology mode")
-						end
-						if metmod=="OFF"
-							continue
-						end
-					catch
-						if parsed_args["verbose"]
-							println("No ESO INS MET MODE keyword, mode set to $metmod")
-						end
-					end
-
-					if metmod == "FAINT"
-						faintparam = buildfaintparameters(read_header(f[1]));
-					end
-
-					metrologyhdu = f["METROLOGY"]
-					(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"],onlyhigh=parsed_args["onlyhigh"])
-					
-					tend = time()
-					if parsed_args["verbose"]
-						println("$filename processed in $(tend-tstart) s")
-					end
-					fname = split(basename(filename),".fits")[1]
-					outname = folder *"/" * fname * parsed_args["suffix"][1] *".fits"
 					close(f)
-					f= FITS(filename)
-					g = FITS(outname, "w")
-					
-					FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr)
-					close(g)
-
-					if parsed_args["verbose"]
-					println(" $outname written")
-					end
-				else 
+					continue
+				end	
+				if !pupmod
 					if parsed_args["verbose"]
 						println("ESO INS PMC1 MODULATE set to false in  $filename")
 					end
+					close(f)
+					continue
 				end
+				
+				faintparam =  nothing
+				if parsed_args["verbose"]
+					println("Processing  $filename")
+				end
+				tstart = time()
+				
+				try (metmod,) = f[1]["ESO INS MET MODE"].value()
+					if parsed_args["verbose"]
+						println("$filename use $metmod metrology mode")
+					end
+					if metmod=="OFF"
+						continue
+					end
+				catch
+					if parsed_args["verbose"]
+						println("No ESO INS MET MODE keyword, mode set to $metmod")
+					end
+				end
+				
+				if metmod == "FAINT"
+					faintparam = buildfaintparameters(FitsHeader(f[1]));
+				end
+				
+				metrologyhdu = f["METROLOGY"]
+				(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"],onlyhigh=parsed_args["onlyhigh"])
+				
+				tend = time()
+				if parsed_args["verbose"]
+					println("$filename processed in $(tend-tstart) s")
+				end
+				fname = split(basename(filename),".fits")[1]
+				outname = folder *"/" * fname * parsed_args["suffix"][1] *".fits"
+				close(f)
+				f= openfits(filename)
+				g = openfits(outname, "w!")
+				
+				FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr)
+				close(g)
+				
+				if parsed_args["verbose"]
+					println(" $outname written")
+				end
+				
+				
 				close(f)
 			end
 		end
