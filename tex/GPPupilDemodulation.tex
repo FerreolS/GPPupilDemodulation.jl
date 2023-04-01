@@ -186,7 +186,13 @@ In FAINT mode the equation \ref{eq:model} is rewritten as:
 \begin{equation}
     \V{d} = \left( c + \V{p} \times  \V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
 \end{equation}
-with the additional factor $p_k$ that is the expected laser power at row $k$. This vector is filled with   mean of the modulus of the data $V{d}$  for each state. In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
+with the additional factor $p_k$ that is the expected laser power at row $k$ for the state $\textrm{ST}(k)$. This vector is filled with   mean of the modulus of the data $\V{d}$  for each state (NORMAL, LOW, HIGH).
+
+\begin{equation}
+    p_k = \Avg{\Abs{d_m}}_{m\in \textrm{ST}(k)}
+\end{equation}
+
+In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
 \begin{equation}
     (c^+, a^+, b^+, \phi^+) = \argmin_{c,a,b,\phi} \Norm{\V{r} -  c - \V{p} \times a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right) }_2^2\label{eq:rfaint}
 \end{equation}
@@ -202,7 +208,7 @@ with the additional factor $p_k$ that is the expected laser power at row $k$. Th
 
 
 As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual diming/brightening of the laser. This lag is automatically estimated and corrected in the Julia code. 
-In addition, there is also a 10ms transient before the laser power stabilizes. Several test were perform with pre/post-switching delay and it does not seems to have measurable impact on the demodulation.
+In addition, there is also a 10ms transient before the laser power stabilizes. Several tests were performed with pre/post-switching delays and it does not seems to have measurable impact on the demodulation.
 \begin{figure}
     \centering
     \includegraphics[width=0.6\linewidth]{figs/FaintStatesZoom.pdf}
