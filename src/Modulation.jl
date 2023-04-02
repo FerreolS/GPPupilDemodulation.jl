@@ -4,6 +4,7 @@ import OptimPackNextGen.Powell.Newuoa.newuoa
 using LinearAlgebra
 using OptimPackNextGen
 using StatsBase
+using StaticArrays
 
 @enum Side FT=0 SC=16
 @enum Diode D1=1 D2=2 D3=3 D4=4 FC
@@ -46,20 +47,13 @@ function getphase(self::Modulation{T},timestamp::AbstractVector) where{T<:Abstra
 	return self.b .* sin.( self.ω .* timestamp .+ self.ϕ ) .+ angle(self.a)
 end
 
-function updatemodulation(self::Modulation{T}, timestamp::AbstractVector, data::AbstractVector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
-	self.b = b
-	self.ϕ = ϕ
-	if b==0.
-		self.c = 0
-		self.a = mean(data)
-		return self.a .* ones(Complex{T},size(data))
-	end
-	model = exp.(ȷ .* (b .* sin.( self.ω .* T.(timestamp) .+ ϕ )))
-	(self.c, self.a) = linearregression( model, data)
-	return 	self.c .+ self.a .* model
+function updatemodulation(self::Modulation{T}, timestamp::AbstractVector, data::AbstractVector{Complex{T}}, power::P,  b::T, ϕ::T) where{T<:AbstractFloat,P<:Union{Vector{T}, T}}
+	model =Vector{Complex{T}}(undef,length(timestamp))
+
+	return updatemodulation!(self, model,  timestamp, data, power, b, ϕ)
 end
 
-function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::AbstractVector, data::AbstractVector{Complex{T}},  b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::AbstractVector, data::AbstractVector{Complex{T}}, power::T, b::T, ϕ::T) where{T<:AbstractFloat}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -68,13 +62,34 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 		fill(self.a, model)
 	else
 		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+		if power==1.
+			(self.c, self.a) = simplelinearregression( model, data)
+			@. model = 	self.c + self.a * model
+		else
+			(self.c, self.a) = simplelinearregression( model, power .\ data)
+			(self.c, self.a) = (self.c, self.a).*power
+			@. model = 	self.c + self.a * model
+		end
+	end
+	return model
+end
+
+function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::AbstractVector, data::AbstractVector{Complex{T}}, power::AbstractVector{T}, b::T, ϕ::T) where{T<:AbstractFloat}
+	self.b = b
+	self.ϕ = ϕ
+	if b==0.
+		self.c = 0
+		self.a = mean(data)
+		fill(self.a, model)
+	else
+		@. model = power.*exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
 		(self.c, self.a) = linearregression( model, data)
 		@. model = 	self.c + self.a * model
 	end
 	return model
 end
 
-function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
+function simplelinearregression( model::Vector{Complex{T}}, data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
 	N = length(model)
 	Sv1 = sum(data)
 	Sv2 = model ⋅ data
@@ -83,6 +98,25 @@ function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Compl
 	c = (Sv1 .- Sv2 .* H12) * detH
 	a = (-Sv1 .* conj(H12) + Sv2) * detH
 	return (c, a)
+end
+
+
+function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
+	A = @MMatrix zeros(Complex{T},2,2)
+    b = @MVector zeros(Complex{T},2)
+
+	N = length(model)
+
+	A[1,1] = N
+	A[2,2] = sum(abs2, model)
+	A[1,2] = sum(model)
+	A[2,1] = conj(A[1,2])
+
+	b[1] = sum(data)
+	b[2] = model ⋅ data
+	output = A \ b
+	
+	return tuple(output...) # (c,a)
 end
 
 
@@ -119,12 +153,12 @@ function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex
 end
 
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
-	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data, b, ϕ)
+	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data,self.power, b, ϕ)
 	return sum(abs2,( self.power .*  pupilmodulation .- self.data))
 end
 
 function (self::Chi2CostFunction{T})(pupilmodulation::AbstractVector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
-	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data, b, ϕ)
+	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data,self.power, b, ϕ)
 	return sum(abs2,( self.power .* pupilmodulation .-  self.data))
 end
 
