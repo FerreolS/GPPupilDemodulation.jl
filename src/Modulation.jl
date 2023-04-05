@@ -8,7 +8,7 @@ using StaticArrays
 
 @enum Side FT=0 SC=16
 @enum Diode D1=1 D2=2 D3=3 D4=4 FC
-
+const M_2PI = 6.283185
 const ȷ=im
 
 include("Faint.jl")
@@ -178,12 +178,21 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 	
 end
 
-function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; xinit=[0.01,0],recenter=true,faintparam::Union{Nothing,FaintStates} = nothing,onlyhigh=false,preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
+function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; 
+						init::Union{Symbol,Vector{T}}=[0.01,0],
+						recenter::Bool=true,
+						faintparam::Union{Nothing,FaintStates} = nothing,
+						onlyhigh=false,
+						preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 
 	likelihood =  Vector{T}(undef,32) 
-	ϕrange= range(0,π,5)
+	ϕrange= range(-π,π,8)
+
+	if !isa(init,Symbol)
+		xinit = init
+	end
 
 	if !isnothing(faintparam)
 		state= buildstates(faintparam, timestamp)
@@ -208,10 +217,10 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 			else
 				power = T.(1.)
 			end
-			lkl = Chi2CostFunction(timestamp[valid],d[valid],power)
+			lkl = Chi2CostFunction(timestamp[valid],d[valid],power,ω=M_2PI)
 
-			if xinit==:auto
-				binit= initialguess(d)
+			if init==:auto
+				binit= 0.01#initialguess(d)
 				ϕinit = ϕrange[argmin(map(ϕ -> lkl(binit,ϕ),ϕrange ))]
 				xinit=[binit, ϕinit]
 			end

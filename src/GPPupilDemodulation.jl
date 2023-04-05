@@ -60,7 +60,7 @@ Returns:
 
 function buildfaintparameters(hdr::FITSHeader)
 
-	mjdobs = hdr["MJD-OBS"]
+	mjdobs = hdr["MJD-OBS"] # ESO PCR ACQ START (microsecond precision)
 	rate1 = hdr["ESO INS ANLO3 RATE1"]
 	rate2 = hdr["ESO INS ANLO3 RATE2"]
 
