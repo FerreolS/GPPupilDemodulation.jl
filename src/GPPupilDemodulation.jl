@@ -195,36 +195,28 @@ function main(args)
 				f= FITS(filename)
 				try (pupmod,) = read_key(f[1],"ESO INS PMC1 MODULATE")
 				catch
-					if parsed_args["verbose"]
-						println("no ESO INS PMC1 MODULATE keyword in $filename")
-					end
+					@info	"no ESO INS PMC1 MODULATE keyword in $filename"
 					continue
 				end		
 				if pupmod
 					faintparam =  nothing
-					if parsed_args["verbose"]
-						println("Processing  $filename")
-					end
+					@info "Processing  $filename"
 					tstart = time()
 
 					try (metmod,) = read_key(f[1],"ESO INS MET MODE")
-						if parsed_args["verbose"]
-							println("$filename use $metmod metrology mode")
-						end
+						@info	"$filename use $metmod metrology mode"
 						if metmod=="OFF"
 							continue
 						end
 					catch
-						if parsed_args["verbose"]
-							println("No ESO INS MET MODE keyword, mode set to $metmod")
-						end
+						@info "No ESO INS MET MODE keyword, mode set to $metmod"
 					end
 
 					if  metmod == "FAINT"
 						if !parsed_args["nofaint"]
 							faintparam = buildfaintparameters(read_header(f[1]));
 						else 
-							println("FAINT mode deactivated")
+							@info "FAINT mode deactivated"
 						end
 					end
 
@@ -232,9 +224,8 @@ function main(args)
 					(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"],onlyhigh=parsed_args["onlyhigh"])
 					
 					tend = time()
-					if parsed_args["verbose"]
-						println("$filename processed in $(tend-tstart) s")
-					end
+					@info "$filename processed in $(tend-tstart) s"
+					
 					fname = split(basename(filename),".fits")[1]
 					outname = folder *"/" * fname * parsed_args["suffix"][1] *".fits"
 					close(f)
@@ -244,13 +235,11 @@ function main(args)
 					FITScopy!(g,f,"METROLOGY"=>table, "METROLOGY"=>hdr)
 					close(g)
 
-					if parsed_args["verbose"]
-					println(" $outname written")
-					end
+					@info " $outname written"
+				
 				else 
-					if parsed_args["verbose"]
-						println("ESO INS PMC1 MODULATE set to false in  $filename")
-					end
+					@info	"ESO INS PMC1 MODULATE set to false in  $filename"
+					
 				end
 				close(f)
 			end
