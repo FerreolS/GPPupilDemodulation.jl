@@ -181,7 +181,7 @@ end
 function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; 
 						init::Union{Symbol,Vector{T}}=[0.01,0],
 						recenter::Bool=true,
-						faintparam::Union{Nothing,FaintStates} = nothing,
+						faintparam::Union{Nothing,FaintStates,Vector{MetState}} = nothing,
 						onlyhigh=false,
 						preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
 
@@ -194,12 +194,15 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 		xinit = init
 	end
 
-	if !isnothing(faintparam)
+	if isa(faintparam,FaintStates)
 		state= buildstates(faintparam, timestamp)
 		lag = estimatelag(state,data[:,idx(SC,1,FC)])
 		@info "lag = $lag"
 		state= buildstates(faintparam, timestamp; lag=lag, preswitchdelay=preswitchdelay,postwitchdelay=postwitchdelay)
+	elseif isa(faintparam,Vector{MetState})
+		state = faintparam
 	end
+
 
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
 		FCphase = angle.(data[:,idx(k,j,FC)])
