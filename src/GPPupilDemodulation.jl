@@ -220,8 +220,12 @@ function main(args)
 						end
 					end
 
-					if !parsed_args["nofaint"] && metmod == "FAINT"
-						faintparam = buildfaintparameters(read_header(f[1]));
+					if  metmod == "FAINT"
+						if !parsed_args["nofaint"]
+							faintparam = buildfaintparameters(read_header(f[1]));
+						else 
+							println("FAINT mode deactivated")
+						end
 					end
 
 					metrologyhdu = f["METROLOGY"]
