@@ -134,6 +134,9 @@ function main(args)
 		"--onlyhigh", "-o"
 			help = "Demodulate only on HIGH metrology  in faint mode"
 			action = :store_true
+		"--nofaint", "-f"
+			help = "Do no use the faint mode state to demodulate"
+			action = :store_true
 		"--recursive", "-r"
 			help = "Recursively explore entire directories."
 			action = :store_true
@@ -217,7 +220,7 @@ function main(args)
 						end
 					end
 
-					if metmod == "FAINT"
+					if !parsed_args["nofaint"] && metmod == "FAINT"
 						faintparam = buildfaintparameters(read_header(f[1]));
 					end
 
