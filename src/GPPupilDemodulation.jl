@@ -11,6 +11,8 @@ include("Modulation.jl")
 
 using ArgParse, FITSIO
 
+include("Utils.jl")
+
 const SUFFIXES = [".fits", ".fits.gz","fits.Z"]
 const MJD_1970_1_1 = 40587.0
 const DAY_TO_SEC = 24*60*60 
