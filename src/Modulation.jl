@@ -234,7 +234,12 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 			else
 				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(timestamp)))))
 			end
-			param[idx(k,j,i)] = lkl.mod
+			modparam = lkl.mod
+			if modparam.b<0
+				modparam.b *= -1
+				modparam.ϕ +=ifelse(modparam.ϕ<0,+π,-π)
+			end
+			param[idx(k,j,i)] = modparam
 		end
 	end
 	return (output, param,likelihood)
