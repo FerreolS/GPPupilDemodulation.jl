@@ -212,9 +212,11 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 			if !isnothing(faintparam) 
 				if onlyhigh
 					valid =  (state.== HIGH)
+				else
+					valid =  trues(size(d))
 				end
 				if any(x-> x == TRANSIENT,state) 
-					valid =  (state .!= TRANSIENT)
+					valid .&=  (state .!= TRANSIENT)
 				end
 				power = compute_mean_power(state,view(data,:,idx(k,j,i)))[valid]
 			else

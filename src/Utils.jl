@@ -17,7 +17,7 @@ function bright2states(bright::Vector{Int32})
 	N = length(bright)
 	states = Vector{MetState}(undef,N)
 	@inbounds @simd for i in eachindex(states, bright)
-		states[i] = maping[bright[i]]
+		states[i] = maping[bright[i]+1]
 	end
 	return states
 end
