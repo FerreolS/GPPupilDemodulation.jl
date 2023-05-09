@@ -9,7 +9,7 @@ struct FaintStates{T<:AbstractFloat,A<:AbstractVector{T}}
 	state2::MetState
 end
  
-function  FaintStates(state1::AbstractVector{T},state2::AbstractVector{T},voltage1,voltage2) where {T<:AbstractFloat}
+function  FaintStates(state1::V,state2::V,voltage1,voltage2) where {T<:AbstractFloat, V<:AbstractVector{T}}
 	A = typeof(state1)
 	if  voltage1 > voltage2  # LOW > HIGH
 	 	return FaintStates{T,A}(state2,state1,voltage2,voltage1,HIGH,LOW)
@@ -74,12 +74,12 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; la
 	return states
 end
 
-function estimatelag(states::Vector{MetState} ,data::AbstractVector{Complex{T}}; range::AbstractVector{Int64}=-10:10) where {T<:AbstractFloat}
+function estimatelag(states::Vector{MetState} ,data::D; range::R=-10:10) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}},R<:AbstractVector{Int64}}
 	m = [mean(abs,data[circshift(states,i) .== HIGH]) for i ∈ range];
 	return range[argmax(m)]
 end
 
-function compute_mean_power(states::Vector{MetState} ,data::AbstractVector{Complex{T}}) where {T<:AbstractFloat}
+function compute_mean_power(states::Vector{MetState} ,data::D) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}}}
 	pow = zeros(T,length(data))
 	 for st ∈ instances(MetState)
 		idx = states.==st

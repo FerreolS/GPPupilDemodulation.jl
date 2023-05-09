@@ -37,23 +37,23 @@ function Modulation{T}(mod::Modulation) where{T<:AbstractFloat}
 	return Modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
 end
 
-function (self::Modulation{T})(timestamp::AbstractVector) where{T<:AbstractFloat,}
+function (self::Modulation{T})(timestamp::D) where{T<:AbstractFloat,D<:AbstractArray{T}}
 	timestamp = T.(timestamp)
 	return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
 end
 
-function getphase(self::Modulation{T},timestamp::AbstractVector) where{T<:AbstractFloat}
+function getphase(self::Modulation{T},timestamp::D) where{T<:AbstractFloat,D<:AbstractArray{T}}
 	timestamp = T.(timestamp)
 	return self.b .* sin.( self.ω .* timestamp .+ self.ϕ ) .+ angle(self.a)
 end
 
-function updatemodulation(self::Modulation{T}, timestamp::AbstractVector, data::AbstractVector{Complex{T}}, power::P,  b::T, ϕ::T) where{T<:AbstractFloat,P<:Union{Vector{T}, T}}
+function updatemodulation(self::Modulation{T}, timestamp::TT, data::D, power::P,  b::T, ϕ::T) where{T<:AbstractFloat,P<:Union{Vector{T}, T},D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
 	model =Vector{Complex{T}}(undef,length(timestamp))
 
 	return updatemodulation!(self, model,  timestamp, data, power, b, ϕ)
 end
 
-function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::AbstractVector, data::AbstractVector{Complex{T}}, power::T, b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::TT, data::D, power::T, b::T, ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -74,13 +74,13 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 	return model
 end
 
-function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::AbstractVector, data::AbstractVector{Complex{T}}, power::AbstractVector{T}, b::T, ϕ::T) where{T<:AbstractFloat}
+function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::TT, data::D, power::Vector{T}, b::T, ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
 		self.c = 0
 		self.a = mean(data)
-		fill(self.a, model)
+		fill!(model,self.a)
 	else
 		@. model = power.*exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
 		(self.c, self.a) = linearregression( model, data)
@@ -89,7 +89,7 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 	return model
 end
 
-function simplelinearregression( model::Vector{Complex{T}}, data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
+function simplelinearregression( model::Vector{Complex{T}}, data::D) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
 	N = length(model)
 	Sv1 = sum(data)
 	Sv2 = model ⋅ data
@@ -101,10 +101,8 @@ function simplelinearregression( model::Vector{Complex{T}}, data::AbstractVector
 end
 
 
-function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
-	A = @MMatrix zeros(Complex{T},2,2)
-    b = @MVector zeros(Complex{T},2)
-
+function linearregression( model::Vector{Complex{T}}, data::D) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
+	
 	N = length(model)
 
 	# A = @MMatrix zeros(Complex{T},2,2)
@@ -121,8 +119,6 @@ function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Compl
 	A = SMatrix{2,2}(N, a12, conj(a12), sum(abs2, model))
 	b = @SVector [sum(data) ,  model ⋅ data]
 	
-	b[1] = sum(data)
-	b[2] = model ⋅ data
 	output = A \ b
 	
 	return tuple(output...) # (c,a)
@@ -173,7 +169,7 @@ end
 
 (self::Chi2CostFunction{T})() where{T<:AbstractFloat}  = self(self.mod.b,self.mod.ϕ)
 (self::Chi2CostFunction{T})(x::Vector{T}) where{T<:AbstractFloat}  = self(x[1],x[2])
-(self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::AbstractVector{T}) where{T<:AbstractFloat}  = self(scratch,x[1],x[2])
+(self::Chi2CostFunction{T})(scratch::Vector{Complex{T}},x::D) where{T<:AbstractFloat,D<:AbstractVector{T}}  = self(scratch,x[1],x[2])
 
 function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFloat}
 	scratch =Vector{Complex{T}}(undef,self.N)
@@ -256,6 +252,6 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 	return (output, param,likelihood)
 end
 
-function initialguess(data::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
+function initialguess(data::D) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}}}
 	std(angle.(data .* exp.(-1ȷ .*angle(mean(data)))))
 end
