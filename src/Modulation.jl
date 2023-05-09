@@ -107,11 +107,20 @@ function linearregression( model::Vector{Complex{T}}, data::AbstractVector{Compl
 
 	N = length(model)
 
-	A[1,1] = N
-	A[2,2] = sum(abs2, model)
-	A[1,2] = sum(model)
-	A[2,1] = conj(A[1,2])
+	# A = @MMatrix zeros(Complex{T},2,2)
+    # b = @MVector zeros(Complex{T},2)
+	# A[1,1] = N
+	# A[2,2] = sum(abs2, model)
+	# A[1,2] = sum(model)
+	# A[2,1] = conj(A[1,2])
 
+	# b[1] = sum(data)
+	# b[2] = model ⋅ data
+
+	a12 = sum(model)
+	A = SMatrix{2,2}(N, a12, conj(a12), sum(abs2, model))
+	b = @SVector [sum(data) ,  model ⋅ data]
+	
 	b[1] = sum(data)
 	b[2] = model ⋅ data
 	output = A \ b
