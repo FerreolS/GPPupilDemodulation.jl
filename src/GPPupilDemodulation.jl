@@ -70,8 +70,8 @@ function buildfaintparameters(hdr::FITSHeader)
 	repeat1 = hdr["ESO INS ANLO3 REPEAT1"]
 	repeat2 = hdr["ESO INS ANLO3 REPEAT2"]
 
-	start1 = hdr["ESO INS ANLO3 TIMER1"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
-	start2 = hdr["ESO INS ANLO3 TIMER2"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
+	start1 = hdr["ESO INS ANLO3 TIMER1"] + MJD_1970_1_1 * DAY_TO_SEC
+	start2 = hdr["ESO INS ANLO3 TIMER2"] +  MJD_1970_1_1 * DAY_TO_SEC
 
 	voltage1 = hdr["ESO INS ANLO3 VOLTAGE1"]
 	voltage2 = hdr["ESO INS ANLO3 VOLTAGE2"]
@@ -132,7 +132,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 		b = similar(times,32,length(times))
 		ϕ = similar(times,32,length(times))
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
-			
+
 			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = faintparam, onlyhigh=onlyhigh)
 	
 			output[I,:] .= _output
