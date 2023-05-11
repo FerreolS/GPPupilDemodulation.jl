@@ -201,10 +201,10 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 	end
 
 	if isa(faintparam,FaintStates)
-		#state= buildstates(faintparam, timestamp)
-		#lag = estimatelag(state,data[:,idx(SC,1,FC)])
-		#@info "lag = $lag"
-		state= buildstates(faintparam, timestamp;  preswitchdelay=preswitchdelay,postwitchdelay=postwitchdelay)
+		state= buildstates(faintparam, timestamp)
+		lag = estimatelag(state,data[:,idx(SC,1,FC)])
+		@info "lag = $lag"
+		state= buildstates(faintparam, timestamp; lag=lag, preswitchdelay=preswitchdelay,postwitchdelay=postwitchdelay)
 	elseif isa(faintparam,Vector{MetState})
 		state = faintparam
 	end

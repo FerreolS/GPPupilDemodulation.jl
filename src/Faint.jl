@@ -32,29 +32,10 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; la
 	currentstate = NORMAL
 	first1 = popfirst!(t1)
 	first2 = popfirst!(t2)
- 
-	forget = 0
-	# May lead to some bug if  first2<first1 and no transient
-	while timestamp[1] > first1
-		if isempty(t1) 
-			first1 = last(timestamp)
-		else
-			first1 = popfirst!(t1)
-		end
-		if timestamp[1] >= first2  
-			currentstate = faintstates.state2
-			if isempty(t2) 
-				first2 = last(timestamp)
-			else
-				first2 = popfirst!(t2)
-			end
-		else
-			currentstate = faintstates.state1
-		end
-	end
 
 	@inbounds @simd for index ∈ 1:N
 		time = timestamp[index]
+		forget = 0
 		# HIGH
 		if time >= first1  
 			currentstate = faintstates.state1
