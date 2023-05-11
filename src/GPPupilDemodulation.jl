@@ -70,8 +70,8 @@ function buildfaintparameters(hdr::FITSHeader)
 	repeat1 = hdr["ESO INS ANLO3 REPEAT1"]
 	repeat2 = hdr["ESO INS ANLO3 REPEAT2"]
 
-	start1 = hdr["ESO INS ANLO3 TIMER1"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
-	start2 = hdr["ESO INS ANLO3 TIMER2"] - (mjdobs - MJD_1970_1_1)*DAY_TO_SEC
+	start1 = hdr["ESO INS ANLO3 TIMER1"] +  MJD_1970_1_1 * DAY_TO_SEC
+	start2 = hdr["ESO INS ANLO3 TIMER2"] +  MJD_1970_1_1 * DAY_TO_SEC
 
 	voltage1 = hdr["ESO INS ANLO3 VOLTAGE1"]
 	voltage2 = hdr["ESO INS ANLO3 VOLTAGE2"]
@@ -92,7 +92,6 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
 	
-	@info window
 	if isnothing(window)
 		(output, param,likelihood) = demodulateall(times, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
 		
@@ -131,13 +130,14 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 		arga = similar(times,32,length(times))
 		b = similar(times,32,length(times))
 		ϕ = similar(times,32,length(times))
+
+		if isnothing(faintparam)
+			ftp = nothing
+		else
+			ftp = buildstates(faintparam, times );
+		end
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
-			if isnothing(faintparam)
-				ftp = nothing
-			else
-				ftp = faintparam[I]
-			end
-			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = ftp, onlyhigh=onlyhigh)
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = ftp[I], onlyhigh=onlyhigh)
 	
 			output[I,:] .= _output
 			
