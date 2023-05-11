@@ -74,12 +74,12 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; la
 	return states
 end
 
-function estimatelag(states::Vector{MetState} ,data::D; range::R=-10:10) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}},R<:AbstractVector{Int64}}
+function estimatelag(states::S ,data::D; range::R=-10:10) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}},R<:AbstractVector{Int64},S<:AbstractVector{MetState}}
 	m = [mean(abs,data[circshift(states,i) .== HIGH]) for i ∈ range];
 	return range[argmax(m)]
 end
 
-function compute_mean_power(states::Vector{MetState} ,data::D) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}}}
+function compute_mean_power(states::S ,data::D) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}},S<:AbstractVector{MetState}}
 	pow = zeros(T,length(data))
 	 for st ∈ instances(MetState)
 		idx = states.==st

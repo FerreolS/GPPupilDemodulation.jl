@@ -186,10 +186,10 @@ end
 function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; 
 							init::Union{Symbol,Vector{T}}=[0.01,0],
 							recenter::Bool=true,
-							faintparam::Union{Nothing,FaintStates,Vector{MetState}} = nothing,
+							faintparam::Union{Nothing,FaintStates,S} = nothing,
 							onlyhigh=false,
 							preswitchdelay=0,
-							postwitchdelay=0)  where{T<:AbstractFloat}
+							postwitchdelay=0)  where{T<:AbstractFloat,S<:AbstractVector{MetState}}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 
@@ -205,7 +205,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 		lag = estimatelag(state,data[:,idx(SC,1,FC)])
 		@info "lag = $lag"
 		state= buildstates(faintparam, timestamp; lag=lag, preswitchdelay=preswitchdelay,postwitchdelay=postwitchdelay)
-	elseif isa(faintparam,Vector{MetState})
+	elseif isa(faintparam,AbstractVector{MetState})
 		state = faintparam
 	end
 
