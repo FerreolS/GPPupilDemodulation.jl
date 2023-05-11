@@ -92,7 +92,6 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
 	
-	@info window
 	if isnothing(window)
 		(output, param,likelihood) = demodulateall(times, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
 		
