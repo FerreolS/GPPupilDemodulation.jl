@@ -92,6 +92,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
 	
+	@info window
 	if isnothing(window)
 		(output, param,likelihood) = demodulateall(times, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
 		
@@ -124,12 +125,12 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	else
 		nwindow = round(Int, window / (times[2] - times[1]))
 		output = similar(cmplxV,length(times),40)
-		x0 = similar(times,length(times),32)
-		y0 = similar(times,length(times),32)
-		absa = similar(times,length(times),32)
-		arga = similar(times,length(times),32)
-		b = similar(times,length(times),32)
-		ϕ = similar(times,length(times),32)
+		x0 = similar(times,32,length(times))
+		y0 = similar(times,32,length(times))
+		absa = similar(times,32,length(times))
+		arga = similar(times,32,length(times))
+		b = similar(times,32,length(times))
+		ϕ = similar(times,32,length(times))
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
 			if isnothing(faintparam)
 				ftp = nothing
@@ -147,12 +148,12 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 					tb = -tb
 					tϕ = rem2pi(tϕ+π,RoundNearest) 
 				end
-				b[I,idx(i,j,k)] .= tb
-				ϕ[I,idx(i,j,k)] .= tϕ 
-				x0[I,idx(i,j,k)] .= real(param[idx(i,j,k)].c)
-				y0[I,idx(i,j,k)] .= imag(param[idx(i,j,k)].c)
-				absa[I,idx(i,j,k)] .= abs(param[idx(i,j,k)].a)
-				arga[I,idx(i,j,k)] .= angle(param[idx(i,j,k)].a)
+				b[idx(i,j,k),I] .= tb
+				ϕ[idx(i,j,k),I] .= tϕ 
+				x0[idx(i,j,k),I] .= real(param[idx(i,j,k)].c)
+				y0[idx(i,j,k),I] .= imag(param[idx(i,j,k)].c)
+				absa[idx(i,j,k),I] .= abs(param[idx(i,j,k)].a)
+				arga[idx(i,j,k),I] .= angle(param[idx(i,j,k)].a)
 			end
 		end
 		#ioutput = reshape(ioutput,:,40)
@@ -210,7 +211,7 @@ function main(args)
 			nargs = 1
 			action = :store_arg
 			arg_type = Float64
-			default = [nothing]
+			default = [0.0]
             help = "Compute demodulation on non overlapping window of WINDOW second"
 		"--dir", "-d"
 			nargs = 1
@@ -285,10 +286,14 @@ function main(args)
 					
 					mjd = read_key(f[1],"MJD-OBS")[1]
 					metrologyhdu = f["METROLOGY"]
+					window = parsed_args["window"][1]
+					if window ==0.
+						window = nothing
+					end
 					(table, hdr) = processmetrology(metrologyhdu,mjd; 
 										faintparam = faintparam, 
 										verb=parsed_args["verbose"], 
-										window = parsed_args["window"],
+										window=window,
 										keepraw=parsed_args["keepraw"],
 										onlyhigh=parsed_args["onlyhigh"])
 					
