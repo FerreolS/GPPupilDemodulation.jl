@@ -132,12 +132,8 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 		b = similar(times,32,length(times))
 		ϕ = similar(times,32,length(times))
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
-			if isnothing(faintparam)
-				ftp = nothing
-			else
-				ftp = faintparam[I]
-			end
-			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = ftp, onlyhigh=onlyhigh)
+			
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = faintparam, onlyhigh=onlyhigh)
 	
 			output[I,:] .= _output
 			
