@@ -102,7 +102,7 @@ end
 
 
 function linearregression( model::Vector{Complex{T}}, data::D) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
-	
+
 	N = length(model)
 
 	# A = @MMatrix zeros(Complex{T},2,2)
@@ -184,11 +184,12 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 end
 
 function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; 
-						init::Union{Symbol,Vector{T}}=[0.01,0],
-						recenter::Bool=true,
-						faintparam::Union{Nothing,FaintStates,Vector{MetState}} = nothing,
-						onlyhigh=false,
-						preswitchdelay=0,postwitchdelay=0)   where{T<:AbstractFloat}
+							init::Union{Symbol,Vector{T}}=[0.01,0],
+							recenter::Bool=true,
+							faintparam::Union{Nothing,FaintStates,Vector{MetState}} = nothing,
+							onlyhigh=false,
+							preswitchdelay=0,
+							postwitchdelay=0)  where{T<:AbstractFloat}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 

@@ -80,41 +80,95 @@ function buildfaintparameters(hdr::FITSHeader)
 	return FaintStates(timer1,timer2,voltage1,voltage2)
 end
 
-function processmetrology(metrologyhdu::TableHDU;faintparam::Union{Nothing,FaintStates} = nothing, keepraw = false,verb=false,onlyhigh=onlyhigh)
+function processmetrology(metrologyhdu::TableHDU, mjd::Float64; 
+								window  = nothing,
+								faintparam::Union{Nothing,FaintStates} = nothing, 
+								keepraw = false,
+								verb=false,
+								onlyhigh=false)
 	hdr = read_header(metrologyhdu)
 	table = Dict(metrologyhdu)
-	time = Float64.(table["TIME"]).*1e-6
+	times = Float64.(table["TIME"]).*1e-6 .+ (DAY_TO_SEC * mjd  )
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
-	(output, param,likelihood) = demodulateall(time, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
-
-	if keepraw
-		s = similar(volt,80+64,size(volt,2))
-		s[1:80,:] .= volt
-		s[81:2:end,:] .=  real(output[:,1:32])'
-		s[82:2:end,:] .=  imag(output[:,1:32])'
-		volt = s
+	
+	if isnothing(window)
+		(output, param,likelihood) = demodulateall(times, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
+		
+		if keepraw
+			s = similar(volt,80+64,size(volt,2))
+			s[1:80,:] .= volt
+			s[81:2:end,:] .=  real(output[:,1:32])'
+			s[82:2:end,:] .=  imag(output[:,1:32])'
+			volt = s
+		else
+			volt[1:2:end,:] .=  real(output)'
+			volt[2:2:end,:] .=  imag(output)'
+		end
+		
+		for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
+			b = param[idx(i,j,k)].b
+			ϕ = param[idx(i,j,k)].ϕ
+			if (b<0)
+				b = -b
+				ϕ = rem2pi(ϕ+π,RoundNearest) 
+			end
+			setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i T$j $k")
+			setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i T$j $k")
+			setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i T$j $k")
+			setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i T$j $k")
+			setindex!(hdr,b,"DEMODULATION SIN AMPLITUDE $i T$j $k")
+			setindex!(hdr,ϕ,"DEMODULATION SIN PHASE $i T$j $k")
+		end
+		
 	else
+		nwindow = round(Int, window / (times[2] - times[1]))
+		output = similar(cmplxV,length(times),40)
+		x0 = similar(times,length(times),32)
+		y0 = similar(times,length(times),32)
+		absa = similar(times,length(times),32)
+		arga = similar(times,length(times),32)
+		b = similar(times,length(times),32)
+		ϕ = similar(times,length(times),32)
+		@views for I in Iterators.partition(axes(times, 1), nwindow)
+			if isnothing(faintparam)
+				ftp = nothing
+			else
+				ftp = faintparam[I]
+			end
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = ftp, onlyhigh=onlyhigh)
+	
+			output[I,:] .= _output
+			
+			for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
+				tb = param[idx(i,j,k)].b
+				tϕ = param[idx(i,j,k)].ϕ
+				if (tb<0)
+					tb = -tb
+					tϕ = rem2pi(tϕ+π,RoundNearest) 
+				end
+				b[I,idx(i,j,k)] .= tb
+				ϕ[I,idx(i,j,k)] .= tϕ 
+				x0[I,idx(i,j,k)] .= real(param[idx(i,j,k)].c)
+				y0[I,idx(i,j,k)] .= imag(param[idx(i,j,k)].c)
+				absa[I,idx(i,j,k)] .= abs(param[idx(i,j,k)].a)
+				arga[I,idx(i,j,k)] .= angle(param[idx(i,j,k)].a)
+			end
+		end
+		#ioutput = reshape(ioutput,:,40)
 		volt[1:2:end,:] .=  real(output)'
 		volt[2:2:end,:] .=  imag(output)'
-	end
-	table["VOLT"] = Float32.(volt)
 
-	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
-	for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
-		b = param[idx(i,j,k)].b
-		ϕ = param[idx(i,j,k)].ϕ
-		if (b<0)
-			b = -b
-			ϕ = rem2pi(ϕ+π,RoundNearest) 
-		end
-		setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i T$j $k")
-		setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i T$j $k")
-		setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i T$j $k")
-		setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i T$j $k")
-		setindex!(hdr,b,"DEMODULATION SIN AMPLITUDE $i T$j $k")
-		setindex!(hdr,ϕ,"DEMODULATION SIN PHASE $i T$j $k")
+		table["X0"] = Float32.(x0)
+		table["Y0"] = Float32.(y0)
+		table["ABSA"] = Float32.(absa)
+		table["ARGA"] = Float32.(arga)
+		table["B"] = Float32.(b)
+		table["PHI"] = Float32.(ϕ)
+
 	end
+	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
+	table["VOLT"] = Float32.(volt)
 	return (table, hdr) 
 end
 
@@ -152,6 +206,12 @@ function main(args)
 		# "--overwrite", "-w"
 		# 	help = "overwrite the original file"
 		# 	action = :store_true
+        "--window", "-w"
+			nargs = 1
+			action = :store_arg
+			arg_type = Float64
+			default = [nothing]
+            help = "Compute demodulation on non overlapping window of WINDOW second"
 		"--dir", "-d"
 			nargs = 1
 			action = :store_arg
@@ -222,9 +282,15 @@ function main(args)
 							@info "FAINT mode deactivated"
 						end
 					end
-
+					
+					mjd = read_key(f[1],"MJD-OBS")[1]
 					metrologyhdu = f["METROLOGY"]
-					(table, hdr) = processmetrology(metrologyhdu; faintparam = faintparam, verb=parsed_args["verbose"], keepraw=parsed_args["keepraw"],onlyhigh=parsed_args["onlyhigh"])
+					(table, hdr) = processmetrology(metrologyhdu,mjd; 
+										faintparam = faintparam, 
+										verb=parsed_args["verbose"], 
+										window = parsed_args["window"],
+										keepraw=parsed_args["keepraw"],
+										onlyhigh=parsed_args["onlyhigh"])
 					
 					tend = time()
 					@info "$filename processed in $(tend-tstart) s"
