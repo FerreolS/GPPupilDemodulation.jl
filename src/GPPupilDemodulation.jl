@@ -137,7 +137,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 			state = buildstates(faintparam, times );
 		end
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
-			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = state[I], onlyhigh=onlyhigh)
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = isnothing(state) ? state : state[I], onlyhigh=onlyhigh)
 	
 			output[I,:] .= _output
 			
@@ -166,7 +166,9 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 		table["ARGA"] = Float32.(arga)
 		table["B"] = Float32.(b)
 		table["PHI"] = Float32.(ϕ)
-		table["STATE"] = Int8.(state)
+		if !isnothing(state) 
+			table["STATE"] = Int8.(state)
+		end
 
 	end
 	setindex!(hdr,"GPPupilDemodulation.jl","PROCSOFT")
