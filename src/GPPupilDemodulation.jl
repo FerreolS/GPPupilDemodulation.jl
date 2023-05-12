@@ -157,8 +157,17 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 			end
 		end
 		#ioutput = reshape(ioutput,:,40)
-		volt[1:2:end,:] .=  real(output)'
-		volt[2:2:end,:] .=  imag(output)'
+
+		if keepraw
+			s = similar(volt,80+64,size(volt,2))
+			s[1:80,:] .= volt
+			s[81:2:end,:] .=  real(output[:,1:32])'
+			s[82:2:end,:] .=  imag(output[:,1:32])'
+			volt = s
+		else
+			volt[1:2:end,:] .=  real(output)'
+			volt[2:2:end,:] .=  imag(output)'
+		end
 
 		table["X0"] = Float32.(x0)
 		table["Y0"] = Float32.(y0)
