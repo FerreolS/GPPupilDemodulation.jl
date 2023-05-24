@@ -137,7 +137,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 			state = buildstates(faintparam, times );
 		end
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
-			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = isnothing(state) ? state : state[I], onlyhigh=onlyhigh)
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = isnothing(state) ? state : state[I], onlyhigh=onlyhigh,init=:auto)
 	
 			output[I,:] .= _output
 			
