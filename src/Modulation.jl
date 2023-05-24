@@ -184,7 +184,7 @@ function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFlo
 end
 
 function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T}}; 
-							init::Union{Symbol,Vector{T}}=[0.01,0],
+							init::Union{Symbol,Vector{T}}=:auto,
 							recenter::Bool=true,
 							faintparam::Union{Nothing,FaintStates,S} = nothing,
 							onlyhigh=false,
@@ -231,7 +231,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 			lkl = Chi2CostFunction(timestamp[valid],d[valid],power,ω=M_2PI)
 
 			if init==:auto
-				binit= 0.01#initialguess(d)
+				binit= 0.1#initialguess(d)
 				ϕinit = ϕrange[argmin(map(ϕ -> lkl(binit,ϕ),ϕrange ))]
 				xinit=[binit, ϕinit]
 			end
