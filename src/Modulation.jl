@@ -82,7 +82,7 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 		self.a = mean(data)
 		fill!(model,self.a)
 	else
-		@. model = power.*exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+		@. model = power*exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
 		(self.c, self.a) = linearregression( model, data)
 		@. model = 	self.c + self.a * model
 	end
