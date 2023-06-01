@@ -1,5 +1,8 @@
 function getmetrology(filename)
-	f =  FITS(filename);
+	getmetrology(FITS(filename));
+end
+
+function getmetrology(f::FITS)
 	hdr = read_header(f[1])
 	metrologyhdu = f["METROLOGY"];
 	table = Dict(metrologyhdu);
