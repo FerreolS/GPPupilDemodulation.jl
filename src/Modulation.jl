@@ -59,7 +59,7 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 	if b==0.
 		self.c = 0
 		self.a = mean(data)
-		fill(self.a, model)
+		fill!(model, self.a)
 	else
 		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
 		if power==1.
@@ -188,8 +188,8 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 							recenter::Bool=true,
 							faintparam::Union{Nothing,FaintStates,S} = nothing,
 							onlyhigh=false,
-							preswitchdelay=0,
-							postwitchdelay=0)  where{T<:AbstractFloat,S<:AbstractVector{MetState}}
+							preswitchdelay=0.01,
+							postwitchdelay=0.3)  where{T<:AbstractFloat,S<:AbstractVector{MetState}}
 
 	output = copy(data)
 	param = Vector{Modulation{T}}(undef,32) 
