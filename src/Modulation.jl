@@ -79,15 +79,41 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 	self.ϕ = ϕ
 	if b==0.
 		self.c = 0
-		self.a = mean(data)
+		self.a = sum(map((x,y) -> x^2 * y,power,data)) / sum(x->x^4,power)
 		fill!(model,self.a)
 	else
-		@. model = power*exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
-		(self.c, self.a) = linearregression( model, data)
+		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+		(self.c, self.a) = linearregression( model, data, power)
 		@. model = 	self.c + self.a * model
 	end
 	return model
 end
+
+
+function linearregression( model::Vector{Complex{T}}, data::D, power::Vector{T}) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
+
+	a11 = zero(T)
+	a12 = zero(Complex{T})
+	a22 = zero(T)
+	b1 = zero(Complex{T})
+	b2 = zero(Complex{T})
+	@inbounds @simd for i in eachindex(model,data,power)
+		p2 = power[i]^2
+		a11 += p2
+		a12 += p2*model[i]
+		a22 += p2*abs2(model[i])
+		b1 += power[i]*data[i]
+		b2 += power[i]*conj(model[i])*data[i]
+	end
+
+	A = SMatrix{2,2}(a11, a12, conj(a12), a22)
+	b = @SVector [b1,  b2]
+
+	output = A \ b
+	
+	return tuple(output...) # (c,a)
+end
+
 
 function simplelinearregression( model::Vector{Complex{T}}, data::D) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
 	N = length(model)
@@ -157,14 +183,32 @@ function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex
 	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(power))
 end
 
+function weighted_norm2(A::AbstractVector,W::AbstractVector)
+	s = zero(promote_type(eltype(A),eltype(W)))
+	@inbounds @simd for i in eachindex(A,W)
+		s += W[i]*A[i]^2
+	end
+	return s
+end
+
+norm2(A::AbstractVector,w::Real) =  w * norm2(A)
+function norm2(A::AbstractVector)
+	s = zero(eltype(A))
+	@inbounds @simd for i in eachindex(A)
+		s += (A[i])^2
+	end
+	return s
+end
+
+
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
 	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data,self.power, b, ϕ)
-	return sum(abs2,( self.power .*  pupilmodulation .- self.data))
+	return weighted_norm2( self.power .*  pupilmodulation .- self.data./self.power,self.power)
 end
 
 function (self::Chi2CostFunction{T})(pupilmodulation::AbstractVector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
 	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data,self.power, b, ϕ)
-	return sum(abs2,( self.power .* pupilmodulation .-  self.data))
+	return weighted_norm2( self.power .* pupilmodulation .-  self.data./self.power,self.power)
 end
 
 (self::Chi2CostFunction{T})() where{T<:AbstractFloat}  = self(self.mod.b,self.mod.ϕ)
