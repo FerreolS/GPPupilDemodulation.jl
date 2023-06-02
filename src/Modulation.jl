@@ -134,7 +134,7 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
     function Chi2CostFunction{T,P}(mod::Modulation{T},
         							timestamp::Vector{T},
         							data::Vector{Complex{T}},
-									power::P) where {T<:AbstractFloat,P<:Union{Vector{T}, T}}
+									power::P) where {T<:AbstractFloat,P<:Union{Vector{T}, Real}}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
 		if P <: Vector
