@@ -183,19 +183,23 @@ function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex
 	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(power))
 end
 
+myeltype(::Complex{T}) where T = T
+myeltype(::AbstractArray{Complex{T}}) where T = T
+myeltype(x) = eltype(x)
+
 function weighted_norm2(A::AbstractVector,W::AbstractVector)
-	s = zero(promote_type(eltype(A),eltype(W)))
+	s = zero(promote_type(myeltype(A),myeltype(W)))
 	@inbounds @simd for i in eachindex(A,W)
-		s += W[i]*A[i]^2
+		s += W[i]*abs2(A[i])
 	end
 	return s
 end
 
-norm2(A::AbstractVector,w::Real) =  w * norm2(A)
+weighted_norm2(A::AbstractVector,w::Real) =  w * norm2(A)
 function norm2(A::AbstractVector)
-	s = zero(eltype(A))
+	s = zero(myeltype(A))
 	@inbounds @simd for i in eachindex(A)
-		s += (A[i])^2
+		s += abs2(A[i])
 	end
 	return s
 end
@@ -218,7 +222,7 @@ end
 function minimize!(self::Chi2CostFunction{T}; xinit=[2,0]) where {T<:AbstractFloat}
 	scratch =Vector{Complex{T}}(undef,self.N)
 	xinit = T.(xinit)
-	(status, x, χ2) =  newuoa(x ->self(scratch,x) , xinit,1,1e-3,maxeval=1500)
+	(status, x, χ2) =  newuoa(x ->self(scratch,x) , xinit,1,1e-3; check=false)
 	return x
 
 	# using Nelder Mead simplex method from Optim.jl is 3x slower than newoa
