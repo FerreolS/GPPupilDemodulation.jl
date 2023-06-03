@@ -207,12 +207,12 @@ end
 
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
 	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data,self.power, b, ϕ)
-	return weighted_norm2( self.power .*  pupilmodulation .- self.data./self.power,self.power)
+	return weighted_norm2( pupilmodulation .- self.data./self.power,self.power.^2)
 end
 
 function (self::Chi2CostFunction{T})(pupilmodulation::AbstractVector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
 	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data,self.power, b, ϕ)
-	return weighted_norm2( self.power .* pupilmodulation .-  self.data./self.power,self.power)
+	return weighted_norm2( pupilmodulation .-  self.data./self.power,self.power.^2)
 end
 
 (self::Chi2CostFunction{T})() where{T<:AbstractFloat}  = self(self.mod.b,self.mod.ϕ)
