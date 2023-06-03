@@ -261,22 +261,25 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
 		FCphase = angle.(data[:,idx(k,j,FC)])
 		for i ∈ (D1,D2,D3,D4)
-			d = view(data,:,idx(k,j,i)) .*  exp.(-1im.*FCphase)
 			valid = (:)
 			if !isnothing(faintparam) 
 				if onlyhigh
 					valid =  (state.== HIGH)
 				else
-					valid =  trues(size(d))
+					valid =  trues(size(FCphase))
 				end
 				if any(x-> x == TRANSIENT,state) 
 					valid .&=  (state .!= TRANSIENT)
 				end
-				power = compute_mean_power(state,view(data,:,idx(k,j,i)))[valid]
+				power = compute_mean_power(state,view(data,:,idx(k,j,i)))#[valid]
 			else
 				power = T.(1.)
 			end
-			lkl = Chi2CostFunction(timestamp[valid],d[valid],power,ω=M_2PI)
+
+			d = view(data,:,idx(k,j,i)) ./ power.*  exp.(-1im.*FCphase)
+			
+
+			lkl = Chi2CostFunction(timestamp[valid],d[valid],1,ω=M_2PI)
 
 			if init==:auto
 				binit= 0.1#initialguess(d)
