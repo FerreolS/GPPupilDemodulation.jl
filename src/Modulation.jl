@@ -269,12 +269,12 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 					valid .&=  (state .!= TRANSIENT)
 				end
 				(power,w) = compute_mean_var_power(state,view(data,:,idx(k,j,i)))#[valid]
-				weight = (sqrt.(power).*w)[valid]
+				weight = ( w .* power.^2)[valid]
 			else
 				weight = power = T.(1.)
 			end
 
-			d = view(data,:,idx(k,j,i)) ./ power.*  exp.(-1im.*FCphase)
+			d = view(data,:,idx(k,j,i)) ./ power .*  exp.(-1im.*FCphase)
 			
 			#lkl = Chi2CostFunction(timestamp[valid],d[valid],1,ω=M_2PI)
 			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,ω=M_2PI)
@@ -296,7 +296,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
-				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
+				@. output[:,idx(k,j,i)] = (d * power - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
 			else
 				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(timestamp)))))
 			end
