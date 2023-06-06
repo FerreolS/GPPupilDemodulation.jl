@@ -25,21 +25,20 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; la
 	t1 = collect(faintstates.timer1 .+ lag*timestep)
 	t2 = collect(faintstates.timer2 .+ lag*timestep)
 
-	bounds(x) = floor(Int,x / (2*timestep)),ceil( Int, x / (2*timestep))
-	(premin,premax) = bounds(preswitchdelay)
-	(postmin,postmax) = bounds(postwitchdelay)
+
+	premax = ceil( Int, preswitchdelay / timestep)
+	postmax = ceil( Int, postwitchdelay / timestep)
 
 	currentstate = NORMAL
 	first1 = popfirst!(t1)
 	first2 = popfirst!(t2)
 
+	forget = 0
 	@inbounds @simd for index ∈ 1:N
 		time = timestamp[index]
-		forget = 0
 		# HIGH
 		if time >= first1  
 			currentstate = faintstates.state1
-			states[index-premin:index] .= TRANSIENT
 			forget = premax
 			if isempty(t1) 
 				first1 = last(timestamp)
@@ -53,7 +52,6 @@ function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; la
 		# LOW
 		if time >= first2
 			currentstate = faintstates.state2
-			states[index-postmin:index] .= TRANSIENT
 			forget = postmax
 			if isempty(t2) 
 				first2 = last(timestamp)
