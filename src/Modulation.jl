@@ -284,6 +284,14 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 				xinit=[binit, ϕinit]
 			end
 			x = minimize!(lkl,xinit=xinit)
+			lklval =  lkl(x)
+			ϕπ = x[2]+ifelse(x[2]<0,+π,-π)
+			
+			if lklval > lkl(x[1],ϕπ)
+				@info "bad minima at $k, $j, $i : $lklval > $(lkl(x[1],ϕπ))"
+				x = minimize!(lkl,xinit=[x[1],ϕπ])
+			end
+
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
 				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
