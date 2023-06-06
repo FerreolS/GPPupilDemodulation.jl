@@ -187,15 +187,16 @@ myeltype(::Complex{T}) where T = T
 myeltype(::AbstractArray{Complex{T}}) where T = T
 myeltype(x) = eltype(x)
 
-function weighted_norm2(A::AbstractVector,W::AbstractVector)
-	s = zero(promote_type(myeltype(A),myeltype(W)))
-	@inbounds @simd for i in eachindex(A,W)
-		s += W[i]*abs2(A[i])
+function weighted_norm2(A::AbstractVector,weight::AbstractVector)
+	s = zero(promote_type(myeltype(A),myeltype(weight)))
+	@inbounds @simd for i in eachindex(A,weight)
+		s += weight[i]*abs2(A[i])
 	end
 	return s
 end
 
 weighted_norm2(A::AbstractVector,w::Real) =  w * norm2(A)
+
 function norm2(A::AbstractVector)
 	s = zero(myeltype(A))
 	@inbounds @simd for i in eachindex(A)
