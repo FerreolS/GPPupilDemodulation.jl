@@ -192,7 +192,7 @@ with the additional factor $p_k$ that is the expected laser power at row $k$ for
 \end{equation}
 In addition we consider that the variance of the noise $\V{e}$ varies with the power of the metrology laser. We define the precision (\ie inverse variance) of a measurements at row $k$ as:
 \begin{equation}
-    w_k = \Var\left(\Abs{d_m}\right)_{m\in \textrm{ST}(k)}
+    w_k = 1/\Var\left(\Abs{d_m}\right)_{m\in \textrm{ST}(k)}
 \end{equation}
 The noise $\V{e}$ is probably Gaussian with identical variance for both real and imaginary part. As consequence, the variance of its modulus follows a Rayleigh distribution but as we treat equally all states it should not make much difference to assume Normal distribution.
 
@@ -209,13 +209,27 @@ with the weighted norm $\Norm{\V x}_{\V w}^2 = \V x\T \,\diag(\V w)\, \V x = \su
 \begin{align}
     (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} \div \V{p}  - \left(c +  a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right) }_{\V w'}^2\label{eq:rfaint}\,,
 \end{align}
-where $\div$ is the element-wise division and 
+where $\div$ is the element-wise division and  $   \V w' =  \V w \times \V p \times \V p$
+
+The closed-form solution for  becomes:
+
 \begin{equation}
-    \V w' =  \V w \times \sqrt{\V p}
+    \left[\begin{array}{l}
+    c^+\\
+    a^+
+    \end{array}\right] =\left[\begin{array}{ll}
+        \sum_i w'_i & \sum_i w'_i\, m_i\\
+        \sum_i   w'_i\,m_i^* &  \sum_i w'_i\, \abs{m_i}^2
+        \end{array}\right]^{-1} \cdot
+    \left[\begin{array}{l}
+    \sum_i w'_i\,d_i\\
+    \sum_i w'_i\,m_i^*\,d_i\\
+    \end{array}\right] 
 \end{equation}
 
 
 
+\subsection{Lag on voltage switching}
 \begin{figure}
     \centering
     \includegraphics[width=0.8\linewidth]{figs/FaintStates.pdf}
@@ -224,8 +238,7 @@ where $\div$ is the element-wise division and
 \end{figure}
 
 
-As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual dimming/brightening of the laser. This lag is automatically estimated and corrected in the Julia code. 
-In addition, there is also a 10ms transient before the laser power stabilizes. Several tests were performed with pre/post-switching delays and it does not seems to have measurable impact on the demodulation.
+As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual dimming/brightening of the laser. This lag can be automatically estimated and corrected in the Julia code (not by default). In addition, there is also a 10ms transient before the laser power stabilizes. These lags and transients are handle by pre/post-switching delays.
 \begin{figure}
     \centering
     \includegraphics[width=0.6\linewidth]{figs/FaintStatesZoom.pdf}
