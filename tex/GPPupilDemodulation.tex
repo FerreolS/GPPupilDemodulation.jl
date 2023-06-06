@@ -184,17 +184,34 @@ The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MOD
 
 In FAINT mode the equation \ref{eq:model} is rewritten as:
 \begin{equation}
-    \V{d} = \left( c + \V{p} \times  \V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
+    \V{d} =  \V{p} \times  \left( c +\V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
 \end{equation}
-with the additional factor $p_k$ that is the expected laser power at row $k$ for the state $\textrm{ST}(k)$. This vector is filled with   mean of the modulus of the data $\V{d}$  for each state (NORMAL, LOW, HIGH).
-
+with the additional factor $p_k$ that is the expected laser power at row $k$ for the state $\textrm{ST}(k)$. This vector is filled with   mean of the modulus of the data $\V{d}$  for each state (NORMAL, LOW, HIGH):
 \begin{equation}
     p_k = \Avg{\Abs{d_m}}_{m\in \textrm{ST}(k)}
 \end{equation}
+In addition we consider that the variance of the noise $\V{e}$ varies with the power of the metrology laser. We define the precision (\ie inverse variance) of a measurements at row $k$ as:
+\begin{equation}
+    w_k = \Var\left(\Abs{d_m}\right)_{m\in \textrm{ST}(k)}
+\end{equation}
+The noise $\V{e}$ is probably Gaussian with identical variance for both real and imaginary part. As consequence, the variance of its modulus follows a Rayleigh distribution but as we treat equally all states it should not make much difference to assume Normal distribution.
 
 In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
+\begin{align}
+    (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} -  \V{p} \times\left(c +  a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right) }_2^2
+\end{align}
+To take into an account this precision, we can rewrite this equation as:
+
+\begin{align}
+    (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} -  \V{p} \times\left(c +  a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right) }_{\V{w}}^2
+\end{align}
+with the weighted norm $\Norm{\V x}_{\V w}^2 = \V x\T \,\diag(\V w)\, \V x = \sum_k w_k \Abs{x_k}^2$. This can be also rewritten as:
+\begin{align}
+    (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} \div \V{p}  - \left(c +  a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right) }_{\V w'}^2\label{eq:rfaint}\,,
+\end{align}
+where $\div$ is the element-wise division and 
 \begin{equation}
-    (c^+, a^+, b^+, \phi^+) = \argmin_{c,a,b,\phi} \Norm{\V{r} -  c - \V{p} \times a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right) }_2^2\label{eq:rfaint}
+    \V w' =  \V w \times \sqrt{\V p}
 \end{equation}
 
 
@@ -207,7 +224,7 @@ In that case, the equation~\ref{eq:r} solved to retrieve the modulation paramete
 \end{figure}
 
 
-As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual diming/brightening of the laser. This lag is automatically estimated and corrected in the Julia code. 
+As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual dimming/brightening of the laser. This lag is automatically estimated and corrected in the Julia code. 
 In addition, there is also a 10ms transient before the laser power stabilizes. Several tests were performed with pre/post-switching delays and it does not seems to have measurable impact on the demodulation.
 \begin{figure}
     \centering
