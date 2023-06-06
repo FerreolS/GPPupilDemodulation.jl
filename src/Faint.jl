@@ -85,3 +85,16 @@ function compute_mean_power(states::S ,data::D) where {T<:AbstractFloat,D<:Abstr
 	 end
 	 return pow
 end
+
+function compute_mean_var_power(states::S ,data::D) where {T<:AbstractFloat,D<:AbstractVector{Complex{T}},S<:AbstractVector{MetState}}
+	m = zeros(T,length(data))
+	w = zeros(T,length(data))
+
+	for st ∈ instances(MetState)
+		idx = states.==st
+		_m = mean(abs,data[idx])
+		m[idx] .= _m
+		w[idx] .= 1 ./ var(abs.(data[idx]);mean=_m)
+	end
+	return (m,w)
+end
