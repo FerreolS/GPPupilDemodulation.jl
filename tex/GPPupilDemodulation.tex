@@ -182,11 +182,7 @@ modulation phase  &      $\phi^+ $       &   \verb|DEMODULATION SIN PHASE|
 
 The FAINT mode of the metrology is active when the keyword \verb|ESO INS MET MODE| is set to \verb|FAINT|. In this case metrology laser is dimmed (the LOW state) during observations and maximized between the frame (the HIGH state) according to the keyword shown on table~\ref{tab:faint}.  This alternating HIGH/LOW state is shown on figure~\ref{fig:faint}. In the firsts and the lasts second the metrology power is in NORMAL state.
 
-In FAINT mode the equation \ref{eq:model} is rewritten as:
-\begin{equation}
-    \V{d} =  \V{p} \times  \left( c +\V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
-\end{equation}
-with the additional factor $p_k$ that is the expected laser power at row $k$ for the state $\textrm{ST}(k)$. This vector is filled with   mean of the modulus of the data $\V{d}$  for each state (NORMAL, LOW, HIGH):
+We define the laser power $p_k$ as the expected laser power at row $k$ for the state $\textrm{ST}(k)$. This vector is filled with   mean of the modulus of the data $\V{d}$  for each state (NORMAL, LOW, HIGH):
 \begin{equation}
     p_k = \Avg{\Abs{d_m}}_{m\in \textrm{ST}(k)}
 \end{equation}
@@ -196,11 +192,33 @@ In addition we consider that the variance of the noise $\V{e}$ varies with the p
 \end{equation}
 The noise $\V{e}$ is probably Gaussian with identical variance for both real and imaginary part. As consequence, the variance of its modulus follows a Rayleigh distribution but as we treat equally all states it should not make much difference to assume Normal distribution.
 
+\subsection{Lag on voltage switching}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figs/FaintStates.pdf}
+    \caption{Modulus of the T1 FT fiber coupler diode and the state of the metrology laser during a whole observation in FAINT mode.}
+    \label{fig:faint}
+\end{figure}
+
+
+As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual dimming/brightening of the laser. This lag can be automatically estimated and corrected in the Julia code (not by default). In addition, there is also a 10ms transient before the laser power stabilizes. These lags and transients are handle by pre/post-switching delays.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\linewidth]{figs/FaintStatesZoom.pdf}
+    \caption{Zoom on the modulus of the T1 FT fiber coupler diode and the state of the metrology laser when the laser is switching to HIGH.}
+    \label{fig:faintzoom}
+\end{figure}
+
+\subsection{Faint model (guess 1)}
+In this mode we consider that the laser power affects both  $c$ and the modulated metrology the equation \ref{eq:model} then rewritten as:
+\begin{equation}
+    \V{d} =  \V{p} \times  \left( c +\V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
+\end{equation}
 In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
 \begin{align}
     (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} -  \V{p} \times\left(c +  a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right) }_2^2
 \end{align}
-To take into an account this precision, we can rewrite this equation as:
+To take into an account the precision of the noise, we can rewrite this equation as:
 
 \begin{align}
     (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} -  \V{p} \times\left(c +  a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right) }_{\V{w}}^2
@@ -228,23 +246,31 @@ The closed-form solution for  becomes:
 \end{equation}
 
 
+\subsection{Faint model (guess 2)}
+In this mode we consider that the laser power affects both only the modulated metrology and not the $c$ component. The equation \ref{eq:model} is then rewritten as:
+\begin{equation}
+    \V{d} =   c +\V{p} \times \V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:modelfaint}
+\end{equation}
+In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
+\begin{align}
+    (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} -  c -  \V{p} \times a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right) }_{\V{w}}^2
+\end{align}
+The closed-form solution for $(c^+, a^+)$  becomes:
+\begin{equation}
+    \left[\begin{array}{l}
+    c^+\\
+    a^+
+    \end{array}\right] =\left[\begin{array}{ll}
+        \sum_i w_i & \sum_i w_i\, \, p_i\,m_i\\
+        \sum_i   w_i\, p_i\,m_i^* &  \sum_i w_i\, \abs{p_i\,m_i}^2
+        \end{array}\right]^{-1} \cdot
+    \left[\begin{array}{l}
+    \sum_i w_i\,d_i\\
+    \sum_i w'i\, p_i\,m_i^*\,d_i\\
+    \end{array}\right] 
+\end{equation}
 
-\subsection{Lag on voltage switching}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.8\linewidth]{figs/FaintStates.pdf}
-    \caption{Modulus of the T1 FT fiber coupler diode and the state of the metrology laser during a whole observation in FAINT mode.}
-    \label{fig:faint}
-\end{figure}
 
-
-As seen on figure \ref{fig:faintzoom}, there is a lag of about 10ms between the switching of voltage and the actual dimming/brightening of the laser. This lag can be automatically estimated and corrected in the Julia code (not by default). In addition, there is also a 10ms transient before the laser power stabilizes. These lags and transients are handle by pre/post-switching delays.
-\begin{figure}
-    \centering
-    \includegraphics[width=0.6\linewidth]{figs/FaintStatesZoom.pdf}
-    \caption{Zoom on the modulus of the T1 FT fiber coupler diode and the state of the metrology laser when the laser is switching to HIGH.}
-    \label{fig:faintzoom}
-\end{figure}
 
 An example on demodulated phase signal is shown on figure~\ref{fig:FaintDemodulated}.
 \begin{figure}
