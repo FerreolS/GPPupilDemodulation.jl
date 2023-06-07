@@ -306,28 +306,31 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 	end
 
 
+	valid = (:)
+	if !isnothing(faintparam) 
+		if onlyhigh
+			valid =  (state.== HIGH)
+		else
+			valid =  trues(size(FCphase))
+		end
+		if any(x-> x == TRANSIENT,state) 
+			valid .&=  (state .!= TRANSIENT)
+		end
+	else
+		weight = power = T.(1.)
+	end
+
 	Threads.@threads for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
-		FCphase = angle.(data[:,idx(k,j,FC)])
+		FCphasor = exp.(1im.*angle.(data[:,idx(k,j,FC)]))
 		for i ∈ (D1,D2,D3,D4)
-			valid = (:)
+			d = view(data,:,idx(k,j,i)) 
 			if !isnothing(faintparam) 
-				if onlyhigh
-					valid =  (state.== HIGH)
-				else
-					valid =  trues(size(FCphase))
-				end
-				if any(x-> x == TRANSIENT,state) 
-					valid .&=  (state .!= TRANSIENT)
-				end
-				(power,weight) = compute_mean_var_power(state[valid],view(data,:,idx(k,j,i))[valid])
-				#weight = ( w .* power.^2)[valid]
+				(power,weight) = compute_mean_var_power(state[valid],d[valid])
 			else
 				weight = power = T.(1.)
 			end
-			p  = power#.* exp.(1im.*FCphase[valid])
-			#d = view(data,:,idx(k,j,i)) 
+			p  = power.* FCphasor[valid]
 			
-			d = view(data,:,idx(k,j,i))  .* exp.(-1im.*FCphase)
 
 			#lkl = Chi2CostFunction(timestamp[valid],d[valid],1,ω=M_2PI)
 			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,p,ω=M_2PI)
@@ -349,9 +352,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
-				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
-				#@. output[:,idx(k,j,i)] = (d * power - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
-				#@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
+				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
 			else
 				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(timestamp)))))
 			end
