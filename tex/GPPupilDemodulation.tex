@@ -253,22 +253,25 @@ In this mode we consider that the laser power affects both only the modulated me
 \end{equation}
 In that case, the equation~\ref{eq:r} solved to retrieve the modulation parameters can be updated   as:
 \begin{align}
-    (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{r} -  c -  \V{p} \times a \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right) }_{\V{w}}^2
+    (c^+, a^+, b^+, \phi^+) &= \argmin_{c,a,b,\phi} \Norm{\V{d} -  c - a\, \V{p}' \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right) }_{\V{w}}^2\,,
 \end{align}
+where $\V{p}' = \V{p}\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)$.
+
 The closed-form solution for $(c^+, a^+)$  becomes:
 \begin{equation}
     \left[\begin{array}{l}
     c^+\\
     a^+
     \end{array}\right] =\left[\begin{array}{ll}
-        \sum_i w_i & \sum_i w_i\, \, p_i\,m_i\\
-        \sum_i   w_i\, p_i\,m_i^* &  \sum_i w_i\, \abs{p_i\,m_i}^2
+        \sum_i w_i & \sum_i w_i\, \, g_i\\
+        \sum_i   w_i\, g_i^* &  \sum_i w_i\, \abs{g_i}^2
         \end{array}\right]^{-1} \cdot
     \left[\begin{array}{l}
     \sum_i w_i\,d_i\\
-    \sum_i w'i\, p_i\,m_i^*\,d_i\\
+    \sum_i w'i\, g_i^*\,d_i\\
     \end{array}\right] 
 \end{equation}
+with $\V{g} =   \V{p}'  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)$
 
 
 
