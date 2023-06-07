@@ -311,7 +311,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 		if onlyhigh
 			valid =  (state.== HIGH)
 		else
-			valid =  trues(size(FCphase))
+			valid =  trues(size(state))
 		end
 		if any(x-> x == TRANSIENT,state) 
 			valid .&=  (state .!= TRANSIENT)
