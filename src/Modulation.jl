@@ -53,7 +53,29 @@ function updatemodulation(self::Modulation{T}, timestamp::TT, data::D, weight::P
 	return updatemodulation!(self, model,  timestamp, data, weight, b, ϕ)
 end
 
-function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::TT, data::D, ::Real, b::T, ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
+function updatemodulation(	self::Modulation{T}, 
+							timestamp::TT, 
+							data::D, 
+							weight::P,
+							power::Q,  
+							b::T, 
+							ϕ::T) where{T<:AbstractFloat,
+										P<:Union{AbstractVector{T}, T},
+										D<:AbstractVector{Complex{T}},
+										Q<:AbstractVector{Complex{T}},
+										TT<:AbstractVector{T}}
+	model =Vector{Complex{T}}(undef,length(timestamp))
+
+	return updatemodulation!(self, model,  timestamp, data, weight,power, b, ϕ)
+end
+
+function updatemodulation!(	self::Modulation{T},
+							model::Vector{Complex{T}},  
+							timestamp::TT, 
+							data::D, 
+							::Real, 
+							b::T,
+							ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
@@ -62,15 +84,30 @@ function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  time
 		fill!(model, self.a)
 	else
 		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
-#		if weight==1.
-			(self.c, self.a) = simplelinearregression( model, data)
-			@. model = 	self.c + self.a * model
-		# else
-		# 	(self.c, self.a) = simplelinearregression( model, data)
-		# 	(self.c, self.a) = (self.c, self.a)
-		# 	@. model = 	self.c + self.a * model
-		# end
+		(self.c, self.a) = simplelinearregression( model, data)
+		@. model = 	self.c + self.a * model
 	end
+	return model
+end
+
+function updatemodulation!(	self::Modulation{T},
+							model::Vector{Complex{T}},  
+							timestamp::TT, 
+							data::D, 
+							weight::P, 
+							power::Q,  
+							b::T,
+							ϕ::T) where{T<:AbstractFloat,
+										D<:AbstractVector{Complex{T}},
+										TT<:AbstractVector{T},
+										P<:Union{AbstractVector{T}, T},
+										Q<:AbstractVector{Complex{T}}}
+	self.b = b
+	self.ϕ = ϕ
+	@. model = power .* exp(ȷ * b * sin( self.ω * timestamp + ϕ ))
+	
+	(self.c, self.a) = linearregression( model, data, weight)
+	@. model = 	self.c + self.a * model
 	return model
 end
 
@@ -105,7 +142,27 @@ function linearregression( model::Vector{Complex{T}}, data::D, weight::Vector{T}
 		b2	+= weight[i]*conj(model[i])*data[i]
 	end
 
-	A = SMatrix{2,2}(a11, a12, conj(a12), a22)
+	A = SMatrix{2,2}([ a11 a12; conj(a12) a22])
+	b = @SVector [b1,  b2]
+
+	output = A \ b
+	
+	return tuple(output...) # (c,a)
+end
+
+function linearregression( model::Vector{Complex{T}}, data::D, ::Real) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
+	N = T(length(model))
+	a12 = zero(Complex{T})
+	a22 = zero(Complex{T})
+	b1 = zero(Complex{T})
+	b2 = zero(Complex{T})
+	@inbounds @simd for i in eachindex(model,data)
+		a12 += model[i]
+		a22 += abs2(model[i])
+		b1 	+= data[i]
+		b2	+= conj(model[i])*data[i]
+	end
+	A = SMatrix{2,2}([ N a12; conj(a12) a22])
 	b = @SVector [b1,  b2]
 
 	output = A \ b
@@ -130,16 +187,6 @@ function linearregression( model::Vector{Complex{T}}, data::D) where{T<:Abstract
 
 	N = length(model)
 
-	# A = @MMatrix zeros(Complex{T},2,2)
-    # b = @MVector zeros(Complex{T},2)
-	# A[1,1] = N
-	# A[2,2] = sum(abs2, model)
-	# A[1,2] = sum(model)
-	# A[2,1] = conj(A[1,2])
-
-	# b[1] = sum(data)
-	# b[2] = model ⋅ data
-
 	a12 = sum(model)
 	A = SMatrix{2,2}(N, a12, conj(a12), sum(abs2, model))
 	b = @SVector [sum(data) ,  model ⋅ data]
@@ -149,6 +196,7 @@ function linearregression( model::Vector{Complex{T}}, data::D) where{T<:Abstract
 	return tuple(output...) # (c,a)
 end
 
+Base.collect(A::Vector{Float64})=A
 
 struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
     N::Int64
@@ -156,30 +204,33 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
     timestamp::Vector{T}
     data::Vector{Complex{T}}
     weight::P
+	power::Vector{Complex{T}}
     function Chi2CostFunction{T,P}(mod::Modulation{T},
         							timestamp::Vector{T},
-        							data::Vector{Complex{T}},
-									weight::P) where {T<:AbstractFloat,P<:Union{Vector{T}, Real}}
+        							data::AbstractVector{Complex{T}},
+									weight::P,
+									power::AbstractVector{Complex{T}}) where {T<:AbstractFloat,P<:Union{AbstractVector{T}, Real}}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
 		if P <: Vector
 			@assert N == size(weight,1) "weight and time must have the same number of lines"
-			return new{T,Vector{T}}(N,mod,timestamp,data,weight)
+			return new{T,Vector{T}}(N,mod,timestamp,collect(data),collect(weight),collect(power))
 		end
-        return new{T,T}(N,mod,timestamp,data,weight)
+		@assert N == size(power,1) "power and time must have the same number of lines"
+        return new{T,T}(N,mod,timestamp,collect(data),weight,collect(power))
     end
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}}; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(1.0))
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::AbstractVector; kwd...) where {T<:AbstractFloat}
+	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(1.0),power)
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::AbstractVector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,Vector{T}}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(weight))
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::AbstractVector,power::AbstractVector; kwd...) where {T<:AbstractFloat}
+	return Chi2CostFunction{T,Vector{T}}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::Number; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(weight))
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::Number,power::AbstractVector; kwd...) where {T<:AbstractFloat}
+	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
 end
 
 myeltype(::Complex{T}) where T = T
@@ -206,12 +257,12 @@ end
 
 
 function (self::Chi2CostFunction{T})(b::T,ϕ::T) where{T<:AbstractFloat}
-	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data,self.weight, b, ϕ)
+	pupilmodulation = updatemodulation(self.mod, self.timestamp, self.data,self.weight,self.power, b, ϕ)
 	return weighted_norm2( pupilmodulation .- self.data,self.weight)./length(pupilmodulation)
 end
 
 function (self::Chi2CostFunction{T})(pupilmodulation::AbstractVector{Complex{T}},b::T,ϕ::T) where{T<:AbstractFloat}
-	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data,self.weight, b, ϕ)
+	updatemodulation!(self.mod, pupilmodulation, self.timestamp, self.data,self.weight,self.power, b, ϕ)
 	return weighted_norm2( pupilmodulation .-  self.data,self.weight)./length(pupilmodulation)
 end
 
@@ -268,16 +319,18 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 				if any(x-> x == TRANSIENT,state) 
 					valid .&=  (state .!= TRANSIENT)
 				end
-				(power,w) = compute_mean_var_power(state,view(data,:,idx(k,j,i)))#[valid]
-				weight = ( w .* power.^2)[valid]
+				(power,weight) = compute_mean_var_power(state[valid],view(data,:,idx(k,j,i))[valid])
+				#weight = ( w .* power.^2)[valid]
 			else
 				weight = power = T.(1.)
 			end
-
-			d = view(data,:,idx(k,j,i)) ./ power .*  exp.(-1im.*FCphase)
+			p  = power#.* exp.(1im.*FCphase[valid])
+			#d = view(data,:,idx(k,j,i)) 
 			
+			d = view(data,:,idx(k,j,i))  .* exp.(-1im.*FCphase)
+
 			#lkl = Chi2CostFunction(timestamp[valid],d[valid],1,ω=M_2PI)
-			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,ω=M_2PI)
+			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,p,ω=M_2PI)
 
 
 			if init==:auto
@@ -296,7 +349,9 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
-				@. output[:,idx(k,j,i)] = (d * power - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
+				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
+				#@. output[:,idx(k,j,i)] = (d * power - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - FCphase- angle(lkl.mod.a)))
+				#@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
 			else
 				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(timestamp)))))
 			end
