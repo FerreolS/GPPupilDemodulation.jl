@@ -15,6 +15,6 @@ will demodulate all the file contained in folder `/data/ESO_archive_night/2023-0
 ### Notebook
 [Notebook](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/notebooks/MetrologyModulation.ipynb) on the metrology data.
 As Nbviewer cannot show plots properly, most of them can be seen 
-[here](https://jovian.ml/ferreols/gravity-metrology-modulation/v/1)
+[here](https://jovian.ml/ferreols/gravity-metrology-modulation/v/1) and [here](https://jovian.com/ferreols/demodulate-gc) for the second notebook on faint mode demodulation.
 ### Notes demodulation
 [![Notes about GRAVITY+ metrology demodulation](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/gh-pages/GPPupilDemodulation.svg)](https://github.com/FerreolS/GPPupilDemodulation.jl/blob/gh-pages/GPPupilDemodulation.pdf)
