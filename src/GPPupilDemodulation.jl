@@ -120,7 +120,49 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 			setindex!(hdr,b,"DEMODULATION SIN AMPLITUDE $i T$j $k")
 			setindex!(hdr,ϕ,"DEMODULATION SIN PHASE $i T$j $k")
 		end
-		
+	elseif	window == :auto
+		output = similar(cmplxV,length(times),40)
+		x0 = similar(times,32,length(times))
+		y0 = similar(times,32,length(times))
+		absa = similar(times,32,length(times))
+		arga = similar(times,32,length(times))
+		b = similar(times,32,length(times))
+		ϕ = similar(times,32,length(times))
+
+		state = buildstates(faintparam, times )
+
+		chunck = Vector{UnitRange{Int64} }()
+		current_i = 1
+		current_v = state[1]
+		for (index, value) ∈ enumerate(state)
+			if current_v != value
+				if (current_v == LOW) || (current_v == NORMAL)
+					push!(chunck, current_i:(index-1))
+				end
+				current_i = index
+				current_v = value
+			end
+		end
+		@views for I in chunck
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; onlyhigh=false)
+	
+			output[I,:] .= _output
+			
+			for (k,j,i) ∈ Iterators.product((D1,D2,D3,D4),1:4,(FT,SC)) 
+				tb = param[idx(i,j,k)].b
+				tϕ = param[idx(i,j,k)].ϕ
+				if (tb<0)
+					tb = -tb
+					tϕ = rem2pi(tϕ+π,RoundNearest) 
+				end
+				b[idx(i,j,k),I] .= tb
+				ϕ[idx(i,j,k),I] .= tϕ 
+				x0[idx(i,j,k),I] .= real(param[idx(i,j,k)].c)
+				y0[idx(i,j,k),I] .= imag(param[idx(i,j,k)].c)
+				absa[idx(i,j,k),I] .= abs(param[idx(i,j,k)].a)
+				arga[idx(i,j,k),I] .= angle(param[idx(i,j,k)].a)
+			end
+		end	
 	else
 		nwindow = round(Int, window / (times[2] - times[1]))
 		output = similar(cmplxV,length(times),40)
@@ -134,7 +176,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 		if isnothing(faintparam)
 			state = nothing
 		else
-			state = buildstates(faintparam, times );
+			state = buildstates(faintparam, times )
 		end
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
 			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = isnothing(state) ? state : state[I], onlyhigh=onlyhigh)

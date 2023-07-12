@@ -370,3 +370,130 @@ end
 function initialguess(data::D) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}}}
 	std(angle.(data .* exp.(-1ȷ .*angle(mean(data)))))
 end
+
+struct offsetscost
+    data::Vector{ComplexF64}
+end
+
+function (f::offsetscost)(x)
+    centered =abs.(f.data .- x[1] .- 1im*x[2])
+    #var(centered,mean = sqrt(π ./4 .* mean(abs2,centered )))
+    return var(centered)
+end
+
+
+function compute_offsets_modulus( data::AbstractMatrix{Complex{T}} ; 
+							only::MetState = LOW,
+							state::Union{Nothing,S}= nothing) where{T<:AbstractFloat,S<:AbstractVector{MetState}}
+	
+	offsets = Vector{ComplexF64}(undef,40)
+	modulus = Vector{ComplexF64}(undef,40)
+	valid = (:)
+	if !isnothing(state) 
+		valid =  (state.== only)
+	end
+
+	Threads.@threads for (i,j,k) ∈ collect(Iterators.product((D1,D2,D3,D4,FC),1:4,(FT,SC)))
+		d = data[valid,idx(k,j,i)]
+		lkl = offsetscost(d)
+		xinit = [0.,0.]
+    	(status, x, χ2) =  newuoa(x ->lkl(x) , xinit,1,1e-3; check=false)
+    	offsets[idx(k,j,i)] = x[1] + 1im*x[2]   
+		modulus[idx(k,j,i)] = mean(abs.(d .- offsets[idx(k,j,i)]))
+ 
+	end
+	return (offsets, modulus)
+end
+
+
+function remove_offsets!(data::AbstractMatrix{Complex{T}} , offsets::AbstractVector{Complex{T}}) where{T<:AbstractFloat}
+	Threads.@threads for (i,j,k) ∈ collect(Iterators.product((D1,D2,D3,D4,FC),1:4,(FT,SC)))
+		data[:,idx(k,j,i)] .-= offsets[idx(k,j,i)]
+	end
+end
+
+struct modulationcost
+    modulus::Float64
+    pulsation::Vector{Float64}
+    data::Vector{ComplexF64}
+end
+
+function (self::modulationcost)(x)
+    ϕ,b,ψ = x
+    r = @. abs2(self.data - self.modulus * exp(1im * (b * sin( self.pulsation + ϕ ) + ψ)))
+    return sum(r)
+end
+
+(self::modulationcost)(x1,x2,x3) = self([x1 x2 x3])
+
+
+function make_chunks(state::AbstractVector{MetState}; only::MetState = LOW)
+	goodchunck = Vector{UnitRange{Int64} }()
+	badchunck = Vector{UnitRange{Int64} }()
+
+	current_i = 1
+	current_v = state[1]
+	for (index, value) ∈ enumerate(state)
+    	if current_v != value
+        	if (current_v == only) 
+            	push!(goodchunck, current_i:(index-1))
+			else
+            	push!(badchunck, current_i:(index-1))
+			end
+    		current_i = index
+        	current_v = value
+    	end
+	end
+	if (current_v == only) 
+		push!(goodchunck, current_i:length(state))
+	else
+		push!(badchunck, current_i:length(state))
+	end
+	return (goodchunck,badchunck)
+end
+
+
+
+function demodulate!(data::Vector{Complex{T}},pulsation::AbstractVector, modulus::Complex{T}) where{T<:AbstractFloat}
+
+	lkl=modulationcost(modulus,pulsation,data)
+	xinit = [0, 1, angle(mean(data))]
+	(status, (ϕ,b,ψ ), χ2) =  newuoa(x ->lkl(x) , xinit,1,1e-3; check=false)
+	data  .*= exp.(-1im .* ( b .* sin.( pulsation .+ ϕ )))
+
+	return  (ϕ,b,ψ,χ2 )
+end
+
+function demodulateall(data::AbstractMatrix{Complex{T}}, 
+						pulsation::AbstractVector,
+						goodchuncks::Vector{UnitRange{Int64}}) where{T<:AbstractFloat}
+
+	N = size(data,1)
+	output = zeros(T,N,40)
+	param = Array{T}(undef,N,32,3)  
+	likelihood =  Array{T}(undef,N,32) 
+
+	for I ∈ goodchuncks 
+		for (j,k) ∈ collect(Iterators.product(1:4,(FT,SC)))
+			FCphasor = exp.(-1im.*angle.(data[I,idx(k,j,FC)]))
+			for i ∈ (D1,D2,D3,D4)
+				ndx = idx(k,j,i)
+				d = (data[I,ndx]).*FCphasor
+				(ϕ,b,ψ, χ2 ) = demodulate!(d,pulsation[I],modulus[ndx])
+				param[I,ndx,1] .= ψ
+				param[I,ndx,2] .= b
+				param[I,ndx,3] .= ϕ
+				likelihood[I,ndx] .= χ2
+
+				if removeFC
+					output[I,idx(k,j,i)] = d
+				else
+					@. output[:,idx(k,j,i)] = d  * conj(FCphasor)
+				end
+			end
+		end
+	end
+	
+	return (output, param,likelihood)
+
+end
