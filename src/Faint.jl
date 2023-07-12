@@ -18,7 +18,7 @@ function  FaintStates(state1::V,state2::V,voltage1,voltage2) where {T<:AbstractF
 
 end
 
-function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; lag::Integer=0,preswitchdelay =0.1,postwitchdelay =0.3) where {T<:AbstractFloat,A<:AbstractVector{T}}
+function buildstates(faintstates::FaintStates{T,A},timestamp::AbstractVector; lag::Integer=0,preswitchdelay =0,postwitchdelay =0) where {T<:AbstractFloat,A<:AbstractVector{T}}
 	N = length(timestamp)
 	states = Vector{MetState}(undef,N)
 	timestep = timestamp[2]-timestamp[1]

@@ -309,7 +309,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 	valid = (:)
 	if !isnothing(faintparam) 
 		if onlyhigh
-			valid = state .> LOW # (state.== HIGH).|| (state.== NORMAL)
+			valid = (state.== HIGH) .|| (state.== NORMAL)
 		else
 			valid =  trues(size(state))
 		end
