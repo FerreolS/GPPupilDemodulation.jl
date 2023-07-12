@@ -202,7 +202,7 @@ function main(args)
 			default = [""]
             help = "Store the demodulated metrogoly in the INPUT.SUFFIX.fits file"
 		"--onlyhigh", "-o"
-			help = "Demodulate only on HIGH metrology  in faint mode"
+			help = "Demodulate metrology using parameters estimated only on HIGH and NORMAL"
 			action = :store_true
 		"--nofaint", "-f"
 			help = "Do no use the faint mode state to demodulate"
