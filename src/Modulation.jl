@@ -112,7 +112,7 @@ function updatemodulation!(	self::M,
 			(self.c, self.a) = simplelinearregression( model, data)
 			@. model = 	self.c + self.a * model
 		else
-			self.a = sum( model ⋅ data) / sum(model )
+			self.a = (model ⋅ data) / sum(abs2,model )
 			@. model = 	self.a * model
 		end
 	end
@@ -141,7 +141,7 @@ function updatemodulation!(	self::M,
 		@. model = 	self.c + self.a * model
 	else
 		mw = model .* weight
-		self.a = sum( mw ⋅ data) / sum(mw)
+		self.a = (mw ⋅ data) / (mw ⋅ model)
 		@. model = 	self.a * model
 	end
 	return model
