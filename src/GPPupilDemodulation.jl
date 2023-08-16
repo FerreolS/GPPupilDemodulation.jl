@@ -80,20 +80,63 @@ function buildfaintparameters(hdr::FITSHeader)
 	return FaintStates(timer1,timer2,voltage1,voltage2)
 end
 
+
+function read_stefan_file()
+	return read_stefan_file(joinpath(pkgdir(@__MODULE__),"data/Stefan_file.txt"))
+end
+
+function read_stefan_file(filename::AbstractString)
+	offsets = Vector{ComplexF64}(undef,40)
+    open(filename) do file
+        for line in eachline(file)
+            if occursin(r"^avg", line)
+                values = split(line)
+                name = values[2]
+				side = @eval $(Symbol(name[1:2]))
+				telescope = parse(Int,name[4])
+				diode = @eval $(Symbol(name[5:6]))
+				offsets[idx(side,telescope, diode)] = 1e-3 .* (parse(Float64, values[3]) + 1im * parse(Float64, values[5])) 
+                
+            end
+        end
+    end
+    return offsets
+end
+
 function processmetrology(metrologyhdu::TableHDU, mjd::Float64; 
 								window  = nothing,
 								faintparam::Union{Nothing,FaintStates} = nothing, 
 								keepraw = false,
 								verb=false,
-								onlyhigh=false)
+								onlyhigh=false,
+								offsets::Union{Vector{ComplexF64},Bool}=true)
+
+
 	hdr = read_header(metrologyhdu)
 	table = Dict(metrologyhdu)
 	times = Float64.(table["TIME"]).*1e-6 .+ (DAY_TO_SEC * mjd  )
+
+	if isnothing(faintparam)
+		state = nothing
+	else
+		state = buildstates(faintparam, times );
+	end
+
 	volt = Float64.(table["VOLT"])
 	cmplxV = volt[1:2:end,:]' .+ im*volt[2:2:end,:]'
 	
+	fitoffsets = false
+	if isa( offsets, Vector{ComplexF64})
+		cmplxV .-= reshape(offsets,1,40)
+	elseif offsets === true
+		cmplxV .-= compute_offsets(cmplxV)
+	else
+		fitoffsets = true
+	end
+
+
 	if isnothing(window)
-		(output, param,likelihood) = demodulateall(times, cmplxV; faintparam = faintparam,onlyhigh=onlyhigh)
+		(output, param,likelihood) = demodulateall(times, cmplxV; faintparam = state,onlyhigh=onlyhigh, fitoffsets=fitoffsets)
 		
 		if keepraw
 			s = similar(volt,80+64,size(volt,2))
@@ -113,8 +156,10 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 				b = -b
 				ϕ = rem2pi(ϕ+π,RoundNearest) 
 			end
-			setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i T$j $k")
-			setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i T$j $k")
+			if fitoffsets
+				setindex!(hdr,real(param[idx(i,j,k)].c),"DEMODULATION CENTER X0 $i T$j $k")
+				setindex!(hdr,imag(param[idx(i,j,k)].c),"DEMODULATION CENTER Y0 $i T$j $k")
+			end
 			setindex!(hdr,abs(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ABS $i T$j $k")
 			setindex!(hdr,angle(param[idx(i,j,k)].a),"DEMODULATION AMPLITUDE ARG $i T$j $k")
 			setindex!(hdr,b,"DEMODULATION SIN AMPLITUDE $i T$j $k")
@@ -124,20 +169,18 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	else
 		nwindow = round(Int, window / (times[2] - times[1]))
 		output = similar(cmplxV,length(times),40)
-		x0 = similar(times,32,length(times))
-		y0 = similar(times,32,length(times))
+
+		if fitoffsets
+			x0 = similar(times,32,length(times))
+			y0 = similar(times,32,length(times))
+		end
 		absa = similar(times,32,length(times))
 		arga = similar(times,32,length(times))
 		b = similar(times,32,length(times))
 		ϕ = similar(times,32,length(times))
 
-		if isnothing(faintparam)
-			state = nothing
-		else
-			state = buildstates(faintparam, times );
-		end
 		@views for I in Iterators.partition(axes(times, 1), nwindow)
-			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = isnothing(state) ? state : state[I], onlyhigh=onlyhigh)
+			(_output, param,likelihood) = demodulateall( times[I], cmplxV[I,:]; faintparam = isnothing(state) ? state : state[I], onlyhigh=onlyhigh, fitoffsets=fitoffsets)
 	
 			output[I,:] .= _output
 			
@@ -150,8 +193,10 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 				end
 				b[idx(i,j,k),I] .= tb
 				ϕ[idx(i,j,k),I] .= tϕ 
-				x0[idx(i,j,k),I] .= real(param[idx(i,j,k)].c)
-				y0[idx(i,j,k),I] .= imag(param[idx(i,j,k)].c)
+				if fitoffsets
+					x0[idx(i,j,k),I] .= real(param[idx(i,j,k)].c)
+					y0[idx(i,j,k),I] .= imag(param[idx(i,j,k)].c)
+				end
 				absa[idx(i,j,k),I] .= abs(param[idx(i,j,k)].a)
 				arga[idx(i,j,k),I] .= angle(param[idx(i,j,k)].a)
 			end
@@ -169,8 +214,10 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 			volt[2:2:end,:] .=  imag(output)'
 		end
 
-		table["X0"] = Float32.(x0)
-		table["Y0"] = Float32.(y0)
+		if fitoffsets
+			table["X0"] = Float32.(x0)
+			table["Y0"] = Float32.(y0)
+		end
 		table["ABSA"] = Float32.(absa)
 		table["ARGA"] = Float32.(arga)
 		table["B"] = Float32.(b)
@@ -216,6 +263,12 @@ function main(args)
 		"--keepraw", "-k"
 			help = "keep raw"
 			action = :store_true
+		"--center", "-c"
+			help = "center voltages"
+			nargs = 1
+			arg_type = String
+			action = :store_arg
+			default =  ["empirical"]
 		# "--overwrite", "-w"
 		# 	help = "overwrite the original file"
 		# 	action = :store_true
@@ -263,6 +316,17 @@ function main(args)
 		
 		Pkg.status("FITSIO")
 	end
+
+	if parsed_args["center"][1] == "stefan"
+		offsets = read_stefan_file()
+	elseif parsed_args["center"][1] == "uncentered"
+		offsets = zeros(ComplexF64,40)
+	elseif parsed_args["center"][1] == "empirical"
+		offsets = true
+	elseif parsed_args["center"][1] == "fit"
+		offsets = false
+	end
+
 	for filename in files
 		if isfile(filename)
 			if endswith(filename,SUFFIXES)
@@ -307,7 +371,8 @@ function main(args)
 										verb=parsed_args["verbose"], 
 										window=window,
 										keepraw=parsed_args["keepraw"],
-										onlyhigh=parsed_args["onlyhigh"])
+										onlyhigh=parsed_args["onlyhigh"],
+										offsets=offsets)
 					
 					tend = time()
 					@info "$filename processed in $(tend-tstart) s"

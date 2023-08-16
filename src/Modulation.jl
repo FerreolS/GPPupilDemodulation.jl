@@ -346,12 +346,12 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 							recenter::Bool=true,
 							faintparam::Union{Nothing,FaintStates,S} = nothing,
 							onlyhigh=false,
-							offsets=false,
+							fitoffsets=false,
 							preswitchdelay=0.01,
 							postwitchdelay=0.3)  where{T<:AbstractFloat,S<:AbstractVector{MetState}}
 
 	output = copy(data)
-	if offsets
+	if fitoffsets
 		param = Vector{ModulationWithOffsets{T}}(undef,32) 
 	else
 		param = Vector{ModulationNoOffsets{T}}(undef,32) 
@@ -396,7 +396,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 			p  = power.* FCphasor[valid]
 			
 
-			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,p,ω=M_2PI,offsets=offsets)
+			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,p,ω=M_2PI,offsets=fitoffsets)
 
 
 			if init==:auto
@@ -415,7 +415,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
-				if offsets
+				if fitoffsets
 					@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
 				else
 					@. output[:,idx(k,j,i)] = (d  ) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
