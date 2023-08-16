@@ -112,7 +112,7 @@ function updatemodulation!(	self::M,
 			(self.c, self.a) = simplelinearregression( model, data)
 			@. model = 	self.c + self.a * model
 		else
-			self.a = sum( model .* data) / sum(model )
+			self.a = sum( model ⋅ data) / sum(model )
 			@. model = 	self.a * model
 		end
 	end
@@ -129,7 +129,7 @@ function updatemodulation!(	self::M,
 							ϕ::T) where{T<:AbstractFloat,
 										D<:AbstractVector{Complex{T}},
 										TT<:AbstractVector{T},
-										P<:Union{AbstractVector{T}, T},
+										P<:AbstractVector{T},
 										Q<:AbstractVector{Complex{T}},
 										M<:Modulation{T}}
 	self.b = b
@@ -140,7 +140,8 @@ function updatemodulation!(	self::M,
 		(self.c, self.a) = linearregression( model, data, weight)
 		@. model = 	self.c + self.a * model
 	else
-		self.a = sum( model .* weight .* data) / sum(model .* weight)
+		mw = model .* weight
+		self.a = sum( mw ⋅ data) / sum(mw)
 		@. model = 	self.a * model
 	end
 	return model
@@ -264,7 +265,7 @@ struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T},M<:Modulation}
     end
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::AbstractVector;offsets=true, kwd...) where {T<:AbstractFloat}
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::AbstractVector; offsets=false, kwd...) where {T<:AbstractFloat}
 	if offsets
 		mod = ModulationWithOffsets(;T=T,kwd...)
 	else
@@ -273,12 +274,22 @@ function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex
 	return Chi2CostFunction{T,T,typeof(mod)}(mod,T.(timestamp),data,T.(1.0),power)
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::AbstractVector,power::AbstractVector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,Vector{T},ModulationWithOffsets{T}}(ModulationWithOffsets(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::AbstractVector,power::AbstractVector;offsets=false, kwd...) where {T<:AbstractFloat}
+	if offsets
+		mod = ModulationWithOffsets(;T=T,kwd...)
+	else
+		mod = ModulationNoOffsets(;T=T,kwd...)
+	end
+	return Chi2CostFunction{T,Vector{T},typeof(mod)}(mod,T.(timestamp),data,T.(weight),Complex{T}.(power))
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::Number,power::AbstractVector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,T,ModulationWithOffsets{T}}(ModulationWithOffsets(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::Number,power::AbstractVector; offsets=false, kwd...) where {T<:AbstractFloat}
+	if offsets
+		mod = ModulationWithOffsets(;T=T,kwd...)
+	else
+		mod = ModulationNoOffsets(;T=T,kwd...)
+	end
+	return Chi2CostFunction{T,T,typeof(mod)}(mod,T.(timestamp),data,T.(weight),Complex{T}.(power))
 end
 
 myeltype(::Complex{T}) where T = T
@@ -335,11 +346,16 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 							recenter::Bool=true,
 							faintparam::Union{Nothing,FaintStates,S} = nothing,
 							onlyhigh=false,
+							offsets=false,
 							preswitchdelay=0.01,
 							postwitchdelay=0.3)  where{T<:AbstractFloat,S<:AbstractVector{MetState}}
 
 	output = copy(data)
-	param = Vector{ModulationWithOffsets{T}}(undef,32) 
+	if offsets
+		param = Vector{ModulationWithOffsets{T}}(undef,32) 
+	else
+		param = Vector{ModulationNoOffsets{T}}(undef,32) 
+	end
 	likelihood =  Vector{T}(undef,32) 
 	ϕrange= range(-π,π,8)
 
@@ -380,8 +396,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 			p  = power.* FCphasor[valid]
 			
 
-			#lkl = Chi2CostFunction(timestamp[valid],d[valid],1,ω=M_2PI)
-			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,p,ω=M_2PI)
+			lkl = Chi2CostFunction(timestamp[valid],d[valid] ,weight,p,ω=M_2PI,offsets=offsets)
 
 
 			if init==:auto
@@ -400,7 +415,11 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 
 			likelihood[idx(k,j,i)] = lkl(x)
 			if recenter
-				@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
+				if offsets
+					@. output[:,idx(k,j,i)] = (d  - lkl.mod.c) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
+				else
+					@. output[:,idx(k,j,i)] = (d  ) * exp(-1im*( $(getphase(lkl.mod, timestamp)) - angle(lkl.mod.a)))
+				end
 			else
 				@. output[:,idx(k,j,i)] = data[:,idx(k,j,i)] * exp(-1im*( angle($(lkl.mod(timestamp)))))
 			end
