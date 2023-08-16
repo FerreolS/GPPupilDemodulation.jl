@@ -21,7 +21,9 @@ function idx(side_::Side,telescope_::Integer, diode_::Diode)
 	return Integer(side_) + (Integer(diode_)-1) + (telescope_-1)*4 + 1 
 end
 
-mutable struct Modulation{T<:AbstractFloat}
+abstract type Modulation{T}  end
+
+mutable struct ModulationWithOffsets{T<:AbstractFloat} <: Modulation{T} 
 	c::Complex{T}
 	a::Complex{T}
 	b::T
@@ -29,17 +31,36 @@ mutable struct Modulation{T<:AbstractFloat}
 	ω::T
 end
 
-function Modulation(;T=Float32,c=0.,a=1.,b=1.,ϕ=0.,ω=2π)
-	return Modulation{T}(c,a,b,ϕ, ω)
+mutable struct ModulationNoOffsets{T<:AbstractFloat} <: Modulation{T} 
+	a::Complex{T}
+	b::T
+	ϕ::T
+	ω::T
 end
 
-function Modulation{T}(mod::Modulation) where{T<:AbstractFloat}
-	return Modulation{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
+function ModulationWithOffsets(;T=Float32,c=0.,a=1.,b=1.,ϕ=0.,ω=2π)
+	return ModulationWithOffsets{T}(c,a,b,ϕ, ω)
+end
+
+function ModulationWithOffsets{T}(mod::ModulationWithOffsets) where{T<:AbstractFloat}
+	return ModulationWithOffsets{T}(convert.(Complex{T},(mod.c,mod.a))...,convert.(T,(mod.b,mod.ϕ, mod.ω))...)
+end
+
+function ModulationNoOffsets(;T=Float32,a=1.,b=1.,ϕ=0.,ω=2π)
+	return ModulationNoOffsets{T}(a,b,ϕ, ω)
+end
+
+function ModulationNoOffsets{T}(mod::ModulationWithOffsets) where{T<:AbstractFloat}
+	return ModulationNoOffsets{T}(convert.(Complex{T},mod.a),convert.(T,(mod.b,mod.ϕ, mod.ω))...)
 end
 
 function (self::Modulation{T})(timestamp::D) where{T<:AbstractFloat,D<:AbstractArray{T}}
 	timestamp = T.(timestamp)
-	return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
+	if isa(self,ModulationWithOffsets{T})
+		return self.c .+ self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
+	else
+		return self.a .* exp.(ȷ .* self.b .* sin.( self.ω .* timestamp .+ self.ϕ ))
+	end
 end
 
 function getphase(self::Modulation{T},timestamp::D) where{T<:AbstractFloat,D<:AbstractArray{T}}
@@ -69,28 +90,36 @@ function updatemodulation(	self::Modulation{T},
 	return updatemodulation!(self, model,  timestamp, data, weight,power, b, ϕ)
 end
 
-function updatemodulation!(	self::Modulation{T},
+function updatemodulation!(	self::M,
 							model::Vector{Complex{T}},  
 							timestamp::TT, 
 							data::D, 
 							::Real, 
 							b::T,
-							ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
+							ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T},M<:Modulation{T}}
 	self.b = b
 	self.ϕ = ϕ
 	if b==0.
-		self.c = 0
+		if M == ModulationWithOffsets{T}
+			self.c = 0
+		end
 		self.a = mean(data)
 		fill!(model, self.a)
 	else
 		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
-		(self.c, self.a) = simplelinearregression( model, data)
-		@. model = 	self.c + self.a * model
+
+		if M == ModulationWithOffsets{T}
+			(self.c, self.a) = simplelinearregression( model, data)
+			@. model = 	self.c + self.a * model
+		else
+			self.a = sum( model .* data) / sum(model )
+			@. model = 	self.a * model
+		end
 	end
 	return model
 end
 
-function updatemodulation!(	self::Modulation{T},
+function updatemodulation!(	self::M,
 							model::Vector{Complex{T}},  
 							timestamp::TT, 
 							data::D, 
@@ -101,30 +130,44 @@ function updatemodulation!(	self::Modulation{T},
 										D<:AbstractVector{Complex{T}},
 										TT<:AbstractVector{T},
 										P<:Union{AbstractVector{T}, T},
-										Q<:AbstractVector{Complex{T}}}
+										Q<:AbstractVector{Complex{T}},
+										M<:Modulation{T}}
 	self.b = b
 	self.ϕ = ϕ
-	@. model = power .* exp(ȷ * b * sin( self.ω * timestamp + ϕ ))
+	@. model = power * exp(ȷ * b * sin( self.ω * timestamp + ϕ ))
 	
-	(self.c, self.a) = linearregression( model, data, weight)
-	@. model = 	self.c + self.a * model
-	return model
-end
-
-function updatemodulation!(self::Modulation{T}, model::Vector{Complex{T}},  timestamp::TT, data::D, weight::Vector{T}, b::T, ϕ::T) where{T<:AbstractFloat,D<:AbstractVector{Complex{T}},TT<:AbstractVector{T}}
-	self.b = b
-	self.ϕ = ϕ
-	if b==0.
-		self.c = 0
-		self.a = sum( weight .* data) / sum(weight)
-		fill!(model,self.a)
-	else
-		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+	if M == ModulationWithOffsets{T}
 		(self.c, self.a) = linearregression( model, data, weight)
 		@. model = 	self.c + self.a * model
+	else
+		self.a = sum( model .* weight .* data) / sum(model .* weight)
+		@. model = 	self.a * model
 	end
 	return model
 end
+
+# function updatemodulation!( self::ModulationWithOffsets{T}, 
+# 							model::Vector{Complex{T}},  
+# 							timestamp::TT, 
+# 							data::D, 
+# 							weight::Vector{T}, 
+# 							b::T, 
+# 							ϕ::T) where{T<:AbstractFloat,
+# 										D<:AbstractVector{Complex{T}},
+# 										TT<:AbstractVector{T}}
+# 	self.b = b
+# 	self.ϕ = ϕ
+# 	if b==0.
+# 		self.c = 0
+# 		self.a = sum( weight .* data) / sum(weight)
+# 		fill!(model,self.a)
+# 	else
+# 		@. model = exp(ȷ * (b * sin( self.ω * timestamp + ϕ )))
+# 		(self.c, self.a) = linearregression( model, data, weight)
+# 		@. model = 	self.c + self.a * model
+# 	end
+# 	return model
+# end
 
 
 function linearregression( model::Vector{Complex{T}}, data::D, weight::Vector{T}) where{T<:AbstractFloat, D<:AbstractVector{Complex{T}}}
@@ -198,39 +241,44 @@ end
 
 Base.collect(A::Vector{Float64})=A
 
-struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T}}
+struct Chi2CostFunction{T<:AbstractFloat,P<:Union{Vector{T}, T},M<:Modulation}
     N::Int64
-    mod::Modulation{T}
+    mod::M
     timestamp::Vector{T}
     data::Vector{Complex{T}}
     weight::P
 	power::Vector{Complex{T}}
-    function Chi2CostFunction{T,P}(mod::Modulation{T},
+    function Chi2CostFunction{T,P,M}(mod::M,
         							timestamp::Vector{T},
         							data::AbstractVector{Complex{T}},
 									weight::P,
-									power::AbstractVector{Complex{T}}) where {T<:AbstractFloat,P<:Union{AbstractVector{T}, Real}}
+									power::AbstractVector{Complex{T}}) where {T<:AbstractFloat,P<:Union{AbstractVector{T}, Real},M<:Modulation}
         N =length(timestamp);
         @assert N == size(data,1) "voltage and time must have the same number of lines"
 		if P <: Vector
 			@assert N == size(weight,1) "weight and time must have the same number of lines"
-			return new{T,Vector{T}}(N,mod,timestamp,collect(data),collect(weight),collect(power))
+			return new{T,Vector{T},M}(N,mod,timestamp,collect(data),collect(weight),collect(power))
 		end
 		@assert N == size(power,1) "power and time must have the same number of lines"
-        return new{T,T}(N,mod,timestamp,collect(data),weight,collect(power))
+        return new{T,T,M}(N,mod,timestamp,collect(data),weight,collect(power))
     end
 end
 
-function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::AbstractVector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(1.0),power)
+function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},power::AbstractVector;offsets=true, kwd...) where {T<:AbstractFloat}
+	if offsets
+		mod = ModulationWithOffsets(;T=T,kwd...)
+	else
+		mod = ModulationNoOffsets(;T=T,kwd...)
+	end
+	return Chi2CostFunction{T,T,typeof(mod)}(mod,T.(timestamp),data,T.(1.0),power)
 end
 
 function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::AbstractVector,power::AbstractVector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,Vector{T}}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
+	return Chi2CostFunction{T,Vector{T},ModulationWithOffsets{T}}(ModulationWithOffsets(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
 end
 
 function Chi2CostFunction(timestamp::AbstractVector,data::AbstractVector{Complex{T}},weight::Number,power::AbstractVector; kwd...) where {T<:AbstractFloat}
-	return Chi2CostFunction{T,T}(Modulation(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
+	return Chi2CostFunction{T,T,ModulationWithOffsets{T}}(ModulationWithOffsets(;T=T,kwd...),T.(timestamp),data,T.(weight),Complex{T}.(power))
 end
 
 myeltype(::Complex{T}) where T = T
@@ -291,7 +339,7 @@ function demodulateall( timestamp::AbstractVector,data::AbstractMatrix{Complex{T
 							postwitchdelay=0.3)  where{T<:AbstractFloat,S<:AbstractVector{MetState}}
 
 	output = copy(data)
-	param = Vector{Modulation{T}}(undef,32) 
+	param = Vector{ModulationWithOffsets{T}}(undef,32) 
 	likelihood =  Vector{T}(undef,32) 
 	ϕrange= range(-π,π,8)
 
