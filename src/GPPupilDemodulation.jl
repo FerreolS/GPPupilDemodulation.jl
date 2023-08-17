@@ -151,7 +151,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	if isa( offsets, Vector{ComplexF64})
 		cmplxV .-= reshape(offsets,1,40)
 	elseif offsets === true
-		cmplxV .-= compute_offsets(cmplxV,state)
+		cmplxV .-= reshape(compute_offsets(cmplxV,state),1,40)
 	else
 		fitoffsets = true
 	end
@@ -290,7 +290,7 @@ function main(args)
 			nargs = 1
 			arg_type = String
 			action = :store_arg
-			default =  ["empirical"]
+			default =  ["stefan"]
 		# "--overwrite", "-w"
 		# 	help = "overwrite the original file"
 		# 	action = :store_true
