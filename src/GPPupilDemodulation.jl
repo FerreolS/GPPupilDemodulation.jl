@@ -1,6 +1,6 @@
 module GPPupilDemodulation
 
-using Logging, Pkg
+using Logging, Pkg, CircleFit
 include("FitsUtils.jl")
 
 import .FitsUtils: FITScopy!
@@ -102,6 +102,28 @@ function read_stefan_file(filename::AbstractString)
     end
     return offsets
 end
+function compute_offsets(cmplxV::AbstractMatrix{Complex{T}},state::Vector{MetState}) where{T<:AbstractFloat}
+	offsets = zeros(ComplexF64,40)
+	Threads.@threads for (i,j,k) ∈ collect(Iterators.product((D1,D2,D3,D4,FC),1:4,(FT,SC)))
+		res = fit(Circle, reim(cmplxV[state .== HIGH,idx(k,j,i)])...)
+		(x,y,r) = coef(res) 
+		offsets[idx(k,j,i),1] = complex(x , y)
+		#offsets[idx(k,j,i),2] = r
+	end
+	return offsets
+end 
+
+
+function compute_offsets(cmplxV::AbstractMatrix{Complex{T}},::Nothing) where{T<:AbstractFloat}
+	offsets = zeros(ComplexF64,40)
+	Threads.@threads for (i,j,k) ∈ collect(Iterators.product((D1,D2,D3,D4,FC),1:4,(FT,SC)))
+		res = fit(Circle, reim(cmplxV[:,idx(k,j,i)])...)
+		(x,y,r) = coef(res) 
+		offsets[idx(k,j,i)] = complex(x , y)
+	end
+	return offsets
+end 
+
 
 function processmetrology(metrologyhdu::TableHDU, mjd::Float64; 
 								window  = nothing,
@@ -129,7 +151,7 @@ function processmetrology(metrologyhdu::TableHDU, mjd::Float64;
 	if isa( offsets, Vector{ComplexF64})
 		cmplxV .-= reshape(offsets,1,40)
 	elseif offsets === true
-		cmplxV .-= compute_offsets(cmplxV)
+		cmplxV .-= compute_offsets(cmplxV,state)
 	else
 		fitoffsets = true
 	end
