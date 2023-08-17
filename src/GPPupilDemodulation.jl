@@ -286,7 +286,11 @@ function main(args)
 			help = "keep raw"
 			action = :store_true
 		"--center", "-c"
-			help = "center voltages"
+			help = "center voltages: the centering methods are :\n
+			- stefan : use stefan measured centers (default)\n \n
+			- empirical : estimate the center by fitting a circle on the data\n \n
+			- uncentered : no centering\n \n
+			- fit : fit all parameters at once as it was done before"
 			nargs = 1
 			arg_type = String
 			action = :store_arg
