@@ -93,7 +93,7 @@ The model of the metrology described equation~\ref{eq:model} is rewritten as:
 \end{equation}
 where $\bar{\omega}_k = k\,\frac{2\,\pi}{500}$.
 
-The pipeline code use the variables \verb+a, b, pha1, pha2+ where \verb|pha1|$=\phi$, \verb|pha2|$=\phi'$ and $s = a \exp(\jmath\,\phi)$.
+The pipeline code use the variables \verb+a, b, pha1, pha2+ where \verb|pha1|$=\phi'$, \verb|pha2|$=\phi$ and $s = a \exp(\jmath\,\phi)$.
 
 
 \subsection{Parameters fitting}
@@ -113,7 +113,7 @@ The phases are then unwrapped if needed.
 \subsection{Computation of the modulation}
 Once the parameters $a,\,b,\,,\phi,\,\phi'$ have been estimated for each chunk, the modulation $\psi$ is computed over a second:
 \begin{equation}
-   \psi_k =  -\arctan(d_k) - \phi'
+   \psi_k =  -\arctan(d_k) - \phi
 \end{equation}
 
 \subsection{Demodulation}
