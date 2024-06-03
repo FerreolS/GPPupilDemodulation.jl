@@ -89,7 +89,7 @@ Within each chunk the metrology is averaged on a single second such that:
 where $t$ is the number of steps in 1 second given by the hard-coded constant \verb|STEPS_PER_SECOND=500|.
 The model of the metrology described equation~\ref{eq:model} is rewritten as:
 \begin{equation}
-    \V{\bar{d}}' = a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi'\right) + \phi\right)+  \V{e}\,,\label{eq:modelpip}
+    \V{\bar{d}} = a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi'\right) + \phi\right)+  \V{e}\,,\label{eq:modelpip}
 \end{equation}
 where $\bar{\omega}_k = k\,\frac{2\,\pi}{500}$.
 
@@ -99,7 +99,7 @@ The pipeline code use the variables \verb+a, b, pha1, pha2+ where \verb|pha1|$=\
 \subsection{Parameters fitting}
 For each chunk, the parameters \verb+a, b, pha1, pha2+ are estimated using the Nelder-Mead Simplex algorithm minimizing the chi-square $\chi^2$ :
 \begin{equation}
-    \chi^2 \left( a, b, \phi, \phi2 \right) =   \Norm{\V{d}' -  a \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi' \right) + \phi \right)}
+    \chi^2 \left( a, b, \phi, \phi2 \right) =   \Norm{\V{\bar{d}} -  a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi' \right) + \phi \right)}
 \end{equation}
 To ensure global minimum, this minimization is performed multiple times with different initializations:
 \begin{itemize}
@@ -113,7 +113,7 @@ The phases are then unwrapped if needed.
 \subsection{Computation of the modulation}
 Once the parameters $a,\,b,\,,\phi,\,\phi'$ have been estimated for each chunk, the modulation $\psi$ is computed over a second:
 \begin{equation}
-   \psi_k =  -\arctan(d_k) - \phi
+   \psi_k =  -\arctan(\bar{d_k}) - \phi
 \end{equation}
 
 \subsection{Demodulation}
