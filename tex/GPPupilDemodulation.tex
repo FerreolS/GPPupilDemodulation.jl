@@ -72,6 +72,57 @@ where $\times$ is the element-wise multiplication, $\V{s}$ is the sought-after d
 
 
 
+
+\section{How it is actually coded in the pipeline}
+
+\subsection{Processing in chunks}
+The demodulation signal is split in chunks of  \verb+MAX_SECONDS_PER_CHUNK = 100+ seconds. In each of these chunks, the phase of the fiber coupler $\Phi_\textrm{FC}$ is supposed to be constant. As a consequence, it is averaged out and each chunk is demodulated independently. 
+
+\subsection{Centering}
+Before processing, metrology signal is centered (such that $\V{c}=\V{0}$). If the keyword \verb+gravity.metrology.use-dark-offsets=TRUE+  it is centered using the dark file if it exists, otherwise, it use hard-coded diode centers computed by S. Gillessen and set in the array \verb+diode_zeros+ in the file \verb|gravi_demodulate.c|. 
+
+\subsection{Averaging}
+Within each chunk the metrology is averaged on a single second such that:
+\begin{equation}
+    \bar{d}_k = \Avg{d_{k+i\,t}, \forall i\in \Natural}\,,
+\end{equation}
+where $t$ is the number of steps in 1 second given by the hard-coded constant \verb|STEPS_PER_SECOND=500|.
+The model of the metrology described equation~\ref{eq:model} is rewritten as:
+\begin{equation}
+    \V{\bar{d}}' = a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi'\right) + \phi\right)+  \V{e}\,,\label{eq:modelpip}
+\end{equation}
+where $\bar{\omega}_k = k\,\frac{2\,\pi}{500}$.
+
+The pipeline code use the variables \verb+a, b, pha1, pha2+ where \verb|pha1|$=\phi$, \verb|pha2|$=\phi'$ and $s = a \exp(\jmath\,\phi)$.
+
+
+\subsection{Parameters fitting}
+For each chunk, the parameters \verb+a, b, pha1, pha2+ are estimated using the Nelder-Mead Simplex algorithm minimizing the chi-square $\chi^2$ :
+\begin{equation}
+    \chi^2 \left( a, b, \phi, \phi2 \right) =   \Norm{\V{d}' -  a \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi' \right) + \phi \right)}
+\end{equation}
+To ensure global minimum, this minimization is performed multiple times with different initializations:
+\begin{itemize}
+    \item $a_0 = \mathrm{std}(\V{d}')$
+    \item $b_0 = 0.25$
+    \item $\phi_0 = \{-\pi/2, 0\} $
+    \item $\phi'_0 = \{-\pi/2, 0\} $
+\end{itemize}
+The phases are then unwrapped if needed.
+
+\subsection{Computation of the modulation}
+Once the parameters $a,\,b,\,,\phi,\,\phi'$ have been estimated for each chunk, the modulation $\psi$ is computed over a second:
+\begin{equation}
+   \psi_k =  -\arctan(d_k) - \phi'
+\end{equation}
+
+\subsection{Demodulation}
+The metrology signal is finally demodulated, chunk-wise each demodulated sample $p_i$  being:
+\begin{equation}
+   p_i = d_i  \exp\left(- \jmath \,\Psi_{\textrm{mod}(i,500)} \right) 
+\end{equation}
+
+
 \section{ Estimating the modulation parameters}
 
 To estimate the modulation parameters we need to disentangle it from the signal  $\V{s}$. This is done using the expansion:

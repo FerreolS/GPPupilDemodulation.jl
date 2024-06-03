@@ -6,7 +6,6 @@ version = "0.1.0"
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 CFITSIO = "3b1b4be9-1499-4b22-8d78-7db3344d1961"
-CircleFit = "a2741ea9-3318-4d4b-8b99-ae5c58b57db7"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"

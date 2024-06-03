@@ -1,6 +1,6 @@
 module GPPupilDemodulation
 
-using Logging, Pkg, CircleFit
+using Logging, Pkg
 include("FitsUtils.jl")
 
 import .FitsUtils: FITScopy!
