@@ -56,19 +56,19 @@ LAMBDA\_LASER   &    &  Float32 & 1E
 When the pupil modulation is on (\verb|ESO INS PMC1 MODULATE| keyword is \verb|true|), the metrology signal is modulated at a frequency of $f=1\,$Hz. 
 This modulation does not affect the fiber coupler diode.
 
-For each diode in \{D1, D2, D3, D4\}, we define the complex measurement $\V{v} \in \Complexes^N$  with $v_i =   x_i + \jmath y_i \,, \quad \forall i \in \llbracket 1,N \rrbracket $ and  $N$ is the number of row of the metrology. The modulation as a function of time is:
+For each diode in \{D1, D2, D3, D4\}, we define the complex measurement $\V{v} \in \Complexes^N$  with $v_i =   x_i + \jmath y_i \,, \quad \forall i \in \llbracket 1,N \rrbracket $ and  $N$ is the number of row in the metrology data. The modulation as a function of time is:
 \begin{equation}
     \V{v} = \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\,.\label{eq:v}
 \end{equation}
-where $\omega = 2\,\pi\,\V{t}$ is the modulation pulsation built from the \verb|TIME| column, the amplitude $b$  and the phase $\phi$  are the modulation parameters to be estimated to demodulate the metrology signal.
+where $\omega = 2\,\pi\,\V{t}$ is the modulation pulsation built from the \verb|TIME| column, the amplitude $b$ and the phase $\phi$ are the modulation parameters that need to be estimated to demodulate the metrology signal.
 
 
 \section{The overall model}
-For a  diode the measured modulated voltage data $\V{d}$ can be modeled by:
+For a diode, the measured modulated voltage data $\V{d}$ can be modeled as follows:
 \begin{equation}
     \V{d} = \left( c + \V{s} \times  \exp\left( \jmath \, b \sin\left( \V{\omega} + \phi\right)\right)\right)\times\exp\left(\jmath\,\Phi_\textrm{FC}\right)+  \V{e}\,,\label{eq:model}
 \end{equation}
-where $\times$ is the element-wise multiplication, $\V{s}$ is the sought-after demodulated  metrology signal, $\Phi_\textrm{FC}$ is the phase of the fiber coupler measurement accounting for FDDL movements. $c  = x_0 + \jmath\,y_0$ is the center of the pupil and $\V{e}$ is a vector representing the errors on the measurement that are supposed Gaussian centered, independent and identically distributed.
+where $\times$ is the element-wise multiplication, $\V{s}$ is the sought-after demodulated  metrology signal, $\Phi_\textrm{FC}$ is the phase of the fiber coupler measurement accounting for FDDL movements. $c  = x_0 + \jmath\,y_0$ is the center of the pupil and $\V{e}$ is a vector representing the measurement errors, which are assumed to be Gaussian centered, independent, and identically distributed.
 
 
 
@@ -76,22 +76,22 @@ where $\times$ is the element-wise multiplication, $\V{s}$ is the sought-after d
 \section{How it is actually coded in the pipeline}
 
 \subsection{Processing in chunks}
-The demodulation signal is split in chunks of  \verb+MAX_SECONDS_PER_CHUNK = 100+ seconds. In each of these chunks, the phase of the fiber coupler $\Phi_\textrm{FC}$ is supposed to be constant. As a consequence, it is averaged out and each chunk is demodulated independently. 
+The demodulation signal is split in chunks of  \verb+MAX_SECONDS_PER_CHUNK = 100+ seconds. In each of these chunks, the phase of the fiber coupler $\Phi_\textrm{FC}$ is assumed to be constant. As a consequence, it is averaged out, and each chunk is demodulated independently. 
 
 \subsection{Centering}
-Before processing, metrology signal is centered (such that $\V{c}=\V{0}$). If the keyword \verb+gravity.metrology.use-dark-offsets=TRUE+  it is centered using the dark file if it exists, otherwise, it use hard-coded diode centers computed by S. Gillessen and set in the array \verb+diode_zeros+ in the file \verb|gravi_demodulate.c|. 
+Before processing, the metrology signal is centered (such that $\V{c}=\V{0}$). If the keyword \verb+gravity.metrology.use-dark-offsets=TRUE+  it is centered using the dark file if it exists; otherwise, it use hard-coded diode centers computed by S. Gillessen and set in the array \verb+diode_zeros+ in the file \verb|gravi_demodulate.c|. 
 
 \subsection{Averaging}
-Within each chunk the metrology is averaged on a single second such that:
+Within each chunk the metrology data is averaged on a single second such that:
 \begin{equation}
-    \bar{d}_k = \Avg{d_{k+i\,t}, \forall i\in \Natural}\,,
+    \bar{d}_k = \Avg{d_{k+i\,T}, \forall i\in \Natural}\,,
 \end{equation}
-where $t$ is the number of steps in 1 second given by the hard-coded constant \verb|STEPS_PER_SECOND=500|.
+where $T$ is the number of steps in 1 second given by the hard-coded constant \verb|STEPS_PER_SECOND=500|.
 The model of the metrology described equation~\ref{eq:model} is rewritten as:
 \begin{equation}
     \V{\bar{d}} = a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi'\right) + \phi\right)+  \V{e}\,,\label{eq:modelpip}
 \end{equation}
-where $\bar{\omega}_k = k\,\frac{2\,\pi}{500}$.
+where $\bar{\omega}_k = k\,\frac{2\,\pi}{500}$ is the modulation pulsation at the $k^\textrm{th}$ step within one second.
 
 The pipeline code use the variables \verb+a, b, pha1, pha2+ where \verb|pha1|$=\phi'$, \verb|pha2|$=\phi$ and $s = a \exp(\jmath\,\phi)$.
 
@@ -99,9 +99,9 @@ The pipeline code use the variables \verb+a, b, pha1, pha2+ where \verb|pha1|$=\
 \subsection{Parameters fitting}
 For each chunk, the parameters \verb+a, b, pha1, pha2+ are estimated using the Nelder-Mead Simplex algorithm minimizing the chi-square $\chi^2$ :
 \begin{equation}
-    \chi^2 \left( a, b, \phi, \phi2 \right) =   \Norm{\V{\bar{d}} -  a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi' \right) + \phi \right)}
+    \chi^2 \left( a, b, \phi, \phi' \right) =   \Norm{\V{\bar{d}} -  a \times  \exp\left( \jmath \, b \sin\left( \V{\bar{\omega}} + \phi' \right) + \phi \right)}^2
 \end{equation}
-To ensure global minimum, this minimization is performed multiple times with different initializations:
+To ensure a global minimum, this minimization is performed multiple times with different initializations:
 \begin{itemize}
     \item $a_0 = \mathrm{std}(\V{d}')$
     \item $b_0 = 0.25$
@@ -111,17 +111,17 @@ To ensure global minimum, this minimization is performed multiple times with dif
 The phases are then unwrapped if needed.
 
 \subsection{Computation of the modulation}
-Once the parameters $a,\,b,\,,\phi,\,\phi'$ have been estimated for each chunk, the modulation $\psi$ is computed over a second:
+Once the parameters $a,\,b,\,,\phi,\,\phi'$ have been estimated for each chunk, the modulation $\psi$ is computed over one second:
 \begin{equation}
    \psi_k =  -\arctan(\bar{d_k}) - \phi
 \end{equation}
 
 \subsection{Demodulation}
-The metrology signal is finally demodulated, chunk-wise each demodulated sample $p_i$  being:
+The metrology signal is finally demodulated, chunk-wise, with each demodulated sample $p_i$  being:
 \begin{equation}
-   p_i = d_i  \exp\left(- \jmath \,\Psi_{\textrm{mod}(i,500)} \right) 
+   p_i = d_i  \exp\left(- \jmath \,\psi_{\textrm{mod}(i,T)} \right) 
 \end{equation}
-
+where $\textrm{mod}(i,T)$ is the modulo of $i$ by $T$.
 
 \section{ Estimating the modulation parameters}
 
